@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Enter password</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #2a2a2a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #111;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .input-wrap {
+      flex: 1;
+      position: relative;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 40px 12px 14px;
+      font-size: 15px;
+      border: 2px solid #d0d7de;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="password"]:focus {
+      border-color: #0969da;
+    }
+    .lock-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #0969da;
+      pointer-events: none;
+    }
+    button {
+      padding: 12px 28px;
+      background: #0969da;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover {
+      background: #0860c4;
+    }
+    .tip {
+      font-size: 12px;
+      color: #888;
+      margin-top: 10px;
+    }
+    .error {
+      color: #cf222e;
+      font-size: 13px;
+      margin-top: 10px;
+      display: none;
+    }
+    .error.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Enter password</h1>
+    <p class="subtitle">This page is password protected.</p>
+    <form id="loginForm" class="row" onsubmit="checkPassword(event)">
+      <div class="input-wrap">
+        <input type="password" id="passwordInput" placeholder="Password" autofocus>
+        <svg class="lock-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <button type="submit">Unlock</button>
+    </form>
+    <p class="tip">Tip: Passwords are case-sensitive.</p>
+    <p class="error" id="errorMsg">Incorrect password. Please try again.</p>
+  </div>
+
+  <script>
+    // Si ya está autenticado, redirige al dashboard
+    if (sessionStorage.getItem('dac_authenticated') === 'true') {
+      window.location.href = 'index.html';
+    }
+
+    function checkPassword(e) {
+      e.preventDefault();
+      const password = document.getElementById('passwordInput').value;
+      const correctPassword = 'dacdemo';
+
+      if (password === correctPassword) {
+        sessionStorage.setItem('dac_authenticated', 'true');
+        window.location.href = 'index.html';
+      } else {
+        document.getElementById('errorMsg').classList.add('show');
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passwordInput').focus();
+      }
+    }
+  </script>
+</body>
+</html>
