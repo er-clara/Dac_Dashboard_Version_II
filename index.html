@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Con Edison · DAC Annual Report</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ============================================================ -->
+  <!-- SIDEBAR · Rendered once, navigation links use hash routing    -->
+  <!-- ============================================================ -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-logo">
+        <img src="logo/ConEd_Logo_completo.svg" alt="Con Edison">
+      </div>
+      <div class="sidebar-brand-mark">DAC Annual Report</div>
+      <div class="sidebar-brand-sub" id="sidebar-sub">Reporting Year —</div>
+    </div>
+
+    <div class="sidebar-section">Overview</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#/" data-route="/">
+        <span class="nav-letter">⌂</span> Executive Summary
+      </a>
+    </nav>
+
+    <div class="sidebar-section">Reporting Areas</div>
+    <nav class="sidebar-nav" id="sidebar-sections">
+      <!-- Section links injected by app.js from payload.sections -->
+    </nav>
+
+    <div class="sidebar-section">Data</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#/ingest" data-route="/ingest">
+        <span class="nav-letter">↓</span> Data Ingestion
+      </a>
+    </nav>
+
+    <div class="sidebar-foot" id="sidebar-foot">
+      <!-- Filled by app.js -->
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- TOPBAR · Year selector + export PDF button                    -->
+  <!-- ============================================================ -->
+  <header class="topbar">
+    <div class="topbar-title">
+      <span class="topbar-logo" aria-hidden="true">
+        <img src="logo/ConEd_Logo_fondo_blanco.jpeg" alt="Con Edison">
+      </span>
+      <span class="crumb">DAC Report</span>
+      <span class="crumb-sep">/</span>
+      <span id="crumb-current">Loading…</span>
+    </div>
+
+    <div class="topbar-actions" id="topbar-actions">
+      <span class="year-label">Reporting Year</span>
+      <select id="year-select" class="year-select" aria-label="Reporting year">
+        <!-- Options injected from payload.meta.years -->
+      </select>
+      <button class="btn" id="btn-export" title="Export this page as PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- CONTENT · The router writes the current view into here        -->
+  <!-- ============================================================ -->
+  <main class="content" id="view-container">
+    <div class="view-loading">
+      <div style="padding:40px; text-align:center; color:var(--text-3);">Loading payload…</div>
+    </div>
+  </main>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- App entry point                                               -->
+<!-- ============================================================ -->
+<script src="app.js"></script>
+
+</body>
+</html>
