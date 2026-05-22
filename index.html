@@ -15,15 +15,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+  <!-- Leaflet CSS (for DAC map widget) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div class="app">
 
-  <!-- ============================================================ -->
-  <!-- SIDEBAR · Rendered once, navigation links use hash routing    -->
-  <!-- ============================================================ -->
   <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="sidebar-brand-logo">
@@ -41,9 +41,7 @@
     </nav>
 
     <div class="sidebar-section">Reporting Areas</div>
-    <nav class="sidebar-nav" id="sidebar-sections">
-      <!-- Section links injected by app.js from payload.sections -->
-    </nav>
+    <nav class="sidebar-nav" id="sidebar-sections"></nav>
 
     <div class="sidebar-section">Data</div>
     <nav class="sidebar-nav">
@@ -52,14 +50,9 @@
       </a>
     </nav>
 
-    <div class="sidebar-foot" id="sidebar-foot">
-      <!-- Filled by app.js -->
-    </div>
+    <div class="sidebar-foot" id="sidebar-foot"></div>
   </aside>
 
-  <!-- ============================================================ -->
-  <!-- TOPBAR · Year selector + export PDF button                    -->
-  <!-- ============================================================ -->
   <header class="topbar">
     <div class="topbar-title">
       <span class="topbar-logo" aria-hidden="true">
@@ -72,9 +65,7 @@
 
     <div class="topbar-actions" id="topbar-actions">
       <span class="year-label">Reporting Year</span>
-      <select id="year-select" class="year-select" aria-label="Reporting year">
-        <!-- Options injected from payload.meta.years -->
-      </select>
+      <select id="year-select" class="year-select" aria-label="Reporting year"></select>
       <button class="btn" id="btn-export" title="Export this page as PDF">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export PDF
@@ -82,9 +73,6 @@
     </div>
   </header>
 
-  <!-- ============================================================ -->
-  <!-- CONTENT · The router writes the current view into here        -->
-  <!-- ============================================================ -->
   <main class="content" id="view-container">
     <div class="view-loading">
       <div style="padding:40px; text-align:center; color:var(--text-3);">Loading payload…</div>
@@ -93,9 +81,8 @@
 
 </div>
 
-<!-- ============================================================ -->
-<!-- App entry point                                               -->
-<!-- ============================================================ -->
+<!-- Leaflet JS (for DAC map widget) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>
 
 </body>

@@ -1289,218 +1289,87 @@
     `;
   }
 
-// ============================================================
-  // DAC MAP · Replaces the Equity Radar chart in Executive Summary
-  // v2 — fixes: title, subtitle, tooltip position, zoom, county bar
-  // ============================================================
+  /** Radar chart: each axis is a section, polygon = DAC share profile. */
+  function renderRadar(baseline, year, sections) {
+    const N = sections.length;
+    const cx = 230, cy = 195, R = 130;
+    const max = 0.7;
 
-  let _mapGeoCache = null;
-  let _leafletMapInstance = null;
-  let _mapGeoLayer = null;
-
-  async function getMapGeo() {
-    if (_mapGeoCache) return _mapGeoCache;
-    const res = await fetch('./map_payload.json');
-    if (!res.ok) throw new Error('map_payload.json not found (' + res.status + ')');
-    _mapGeoCache = await res.json();
-    return _mapGeoCache;
-  }
-
-  function dacMapColor(score) {
-    if (score == null || score === '') return '#b8b8b8';
-    const s = parseFloat(score);
-    if (isNaN(s))  return '#b8b8b8';
-    if (s >= 120)  return '#0a2540';
-    if (s >= 110)  return '#1e4d80';
-    if (s >= 100)  return '#2f5496';
-    if (s >= 90)   return '#6fa0d6';
-    return '#d4e3f2';
-  }
-
-  const _mapState = { county: null };
-
-  function renderDACMap(baseline, year, sections) {
-    const mapId = 'dac-leaflet-map-' + Date.now();
-    window._dacMapContainerId = mapId;
-
-    const countyButtons = [
-      { key: null,          label: 'All' },
-      { key: 'Kings',       label: 'Brooklyn' },
-      { key: 'Bronx',       label: 'Bronx' },
-      { key: 'Queens',      label: 'Queens' },
-      { key: 'New York',    label: 'Manhattan' },
-      { key: 'Richmond',    label: 'Staten Is.' },
-      { key: 'Westchester', label: 'Westchester' },
-    ];
-
-    const btnHtml = countyButtons.map(b =>
-      `<button class="dac-map-county-btn${_mapState.county === b.key ? ' active' : ''}"
-        data-county="${b.key === null ? '' : b.key}" type="button">${b.label}</button>`
-    ).join('');
+    const ptsCurr = sections.map((s, i) => {
+      const angle = (Math.PI * 2 * i / N) - Math.PI / 2;
+      const v = s.pctByYear[year] || 0;
+      const r = (v / max) * R;
+      return [cx + Math.cos(angle) * r, cy + Math.sin(angle) * r];
+    });
+    const ptsBench = sections.map((s, i) => {
+      const angle = (Math.PI * 2 * i / N) - Math.PI / 2;
+      const r = (baseline / 100 / max) * R;
+      return [cx + Math.cos(angle) * r, cy + Math.sin(angle) * r];
+    });
+    const pathFromPoints = pts =>
+      'M ' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L ') + ' Z';
+    const gridCircles = [10, 20, 30, 40, 50, 60, 70].map(p => {
+      const r = (p / 100 / max) * R;
+      return `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 3"/>`;
+    }).join('');
+    const axes = sections.map((s, i) => {
+      const angle = (Math.PI * 2 * i / N) - Math.PI / 2;
+      const lineX = cx + Math.cos(angle) * R;
+      const lineY = cy + Math.sin(angle) * R;
+      const labelX = cx + Math.cos(angle) * (R + 22);
+      const labelY = cy + Math.sin(angle) * (R + 22);
+      let anchor = 'middle';
+      if (Math.cos(angle) > 0.3) anchor = 'start';
+      else if (Math.cos(angle) < -0.3) anchor = 'end';
+      return `
+        <line x1="${cx}" y1="${cy}" x2="${lineX.toFixed(1)}" y2="${lineY.toFixed(1)}" stroke="var(--line)" stroke-width="0.5"/>
+        <text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle"
+              font-size="11" font-weight="600" fill="var(--text-2)">${escapeHtml(s.radarName)}</text>
+      `;
+    }).join('');
+    const dots = ptsCurr.map((p, i) => {
+      const s = sections[i];
+      const v = s.pctByYear[year];
+      const has = v != null;
+      const pctText = has ? (v * 100).toFixed(1) + '%' : '—';
+      const kpi = s.primaryKpi;
+      const vv = kpi && kpi.values && kpi.values[year];
+      const dacVal = vv ? vv.dac : null;
+      const totalVal = vv ? vv.total : null;
+      const kpiLabel = kpi ? kpi.label : '';
+      const kpiUnit = kpi ? kpi.unit : '';
+      return `<circle class="radar-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="var(--dusk)" stroke="white" stroke-width="1.5" data-section="${s.id}" data-name="${escapeHtml(s.name)}" data-pct="${pctText}" data-baseline="${baseline}%" data-kpi-label="${escapeHtml(kpiLabel).replace(/"/g, '&quot;')}" data-dac-val="${fmtKpiVal(dacVal, kpi)}" data-total-val="${fmtKpiVal(totalVal, kpi)}" data-unit="${escapeHtml(kpiUnit)}"/>`;
+    }).join('');
+    const scaleLabels = [10, 30, 50, 70].map(p => {
+      const r = (p / 100 / max) * R;
+      return `<text x="${cx + 3}" y="${cy - r + 3}" font-size="9" fill="var(--text-3)" font-family="Inter">${p}%</text>`;
+    }).join('');
 
     return `
-      <div class="exec-card dac-map-card">
+      <div class="exec-card">
         <div class="chart-card-head">
           <div>
-            <h3>DAC Tracts · Combined Burden Score</h3>
-            <p class="chart-sub">Census tracts colored by equity score · ${year}</p>
+            <h3>Equity Radar · 360° Profile</h3>
+            <p class="chart-sub">Each axis = one section · Dashed line = ${baseline}% goal · ${year}</p>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk)"></span>${year}</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--mauve-shadow);width:8px;height:2px;"></span>${baseline}% goal</div>
           </div>
         </div>
-        <div class="dac-map-legend" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;margin-bottom:4px">
-          <span class="dac-map-legend-label">Score:</span>
-          <span class="dac-map-leg-swatch" style="background:#d4e3f2"></span><span class="dac-map-leg-text">&lt;90</span>
-          <span class="dac-map-leg-swatch" style="background:#6fa0d6"></span><span class="dac-map-leg-text">90–99</span>
-          <span class="dac-map-leg-swatch" style="background:#2f5496"></span><span class="dac-map-leg-text">100–109</span>
-          <span class="dac-map-leg-swatch" style="background:#1e4d80"></span><span class="dac-map-leg-text">110–119</span>
-          <span class="dac-map-leg-swatch" style="background:#0a2540"></span><span class="dac-map-leg-text">120+</span>
-          <span class="dac-map-leg-swatch" style="background:#b8b8b8"></span><span class="dac-map-leg-text">N/A</span>
-        </div>
-        <div class="dac-map-county-bar" style="flex-wrap:nowrap;gap:4px">${btnHtml}</div>
-        <div style="position:relative;flex:1">
-          <div id="${mapId}" class="dac-map-container"></div>
-          <div id="dac-map-tooltip" class="dac-map-tooltip" style="display:none;position:absolute;z-index:9999;pointer-events:none"></div>
+        <div class="chart-body">
+          <div class="radar-body">
+            <svg viewBox="0 0 460 390" class="radar-svg">
+              ${gridCircles}${axes}${scaleLabels}
+              <path d="${pathFromPoints(ptsBench)}" fill="none" stroke="var(--mauve-shadow)" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.7"/>
+              <path d="${pathFromPoints(ptsCurr)}" fill="var(--dusk)" fill-opacity="0.18" stroke="var(--dusk)" stroke-width="2"/>
+              ${dots}
+            </svg>
+          </div>
         </div>
       </div>
     `;
   }
-
-  async function mountDACMap() {
-    const containerId = window._dacMapContainerId;
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    if (_leafletMapInstance) {
-      try { _leafletMapInstance.remove(); } catch(e) {}
-      _leafletMapInstance = null;
-      _mapGeoLayer = null;
-    }
-
-    container.innerHTML = '<div class="dac-map-loading">Loading tract data…</div>';
-
-    let geo;
-    try {
-      geo = await getMapGeo();
-    } catch(err) {
-      container.innerHTML = '<div class="dac-map-loading dac-map-error">⚠ Could not load map_payload.json.</div>';
-      return;
-    }
-
-    container.innerHTML = '';
-
-    const map = L.map(containerId, {
-      zoomControl: false,
-      attributionControl: false,
-    });
-    _leafletMapInstance = map;
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-    }).addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, pane: 'shadowPane',
-    }).addTo(map);
-
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-    function styleFeature(feature) {
-      const active = _mapState.county;
-      const fCounty = feature.properties.County;
-      const dimmed = active && fCounty !== active;
-      return {
-        fillColor: dacMapColor(feature.properties.Comb_Sc),
-        fillOpacity: dimmed ? 0.12 : 0.78,
-        color: '#ffffff',
-        weight: 0.6,
-        opacity: dimmed ? 0.2 : 1,
-      };
-    }
-
-    // Tooltip is now a sibling of the map container, inside the relative wrapper
-    const tooltipWrapper = container.parentElement;
-    const tooltip = tooltipWrapper ? tooltipWrapper.querySelector('#dac-map-tooltip') : null;
-
-    function onEach(feature, layer) {
-      const p = feature.properties;
-      layer.on('mouseover', function() {
-        this.setStyle({ weight: 2, color: '#e87722', fillOpacity: 0.92 });
-        this.bringToFront();
-        if (!tooltip) return;
-        const score  = p.Comb_Sc   != null ? parseFloat(p.Comb_Sc).toFixed(1)   : '—';
-        const rankSt = p.Rank_State != null ? parseFloat(p.Rank_State).toFixed(1) : '—';
-        const pop    = p.Pop_Cnt    != null ? parseInt(p.Pop_Cnt).toLocaleString() : '—';
-        const eAdj   = p.elec_adj   != null ? '$' + parseFloat(p.elec_adj).toFixed(2)  : '—';
-        const gAdj   = p.gas_adj    != null ? '$' + parseFloat(p.gas_adj).toFixed(2)   : '—';
-        const eAccts = p.elec_accts != null ? parseInt(p.elec_accts).toLocaleString()  : '—';
-        tooltip.innerHTML =
-          '<div class="dac-tt-geoid">' + (p.GEOID || '') + '</div>' +
-          '<div class="dac-tt-county">' + (p.County || '') + '</div>' +
-          '<div class="dac-tt-row"><span>Combined Score</span><span class="dac-tt-v">' + score + '</span></div>' +
-          '<div class="dac-tt-row"><span>State Rank</span><span class="dac-tt-v">' + rankSt + '</span></div>' +
-          '<div class="dac-tt-row"><span>Population</span><span class="dac-tt-v">' + pop + '</span></div>' +
-          '<div class="dac-tt-row"><span>Elec. adj.</span><span class="dac-tt-v">' + eAdj + '</span></div>' +
-          '<div class="dac-tt-row"><span>Gas adj.</span><span class="dac-tt-v">' + gAdj + '</span></div>' +
-          '<div class="dac-tt-row"><span>Elec. accts</span><span class="dac-tt-v">' + eAccts + '</span></div>';
-        tooltip.style.display = 'block';
-      });
-      layer.on('mousemove', function(e) {
-        if (!tooltip || !tooltipWrapper) return;
-        const rect = tooltipWrapper.getBoundingClientRect();
-        let x = e.originalEvent.clientX - rect.left + 12;
-        let y = e.originalEvent.clientY - rect.top  - 8;
-        const tw = tooltip.offsetWidth  || 210;
-        const th = tooltip.offsetHeight || 180;
-        if (x + tw > rect.width  - 4) x = x - tw - 20;
-        if (y + th > rect.height - 4) y = y - th;
-        if (x < 4) x = 4;
-        if (y < 4) y = 4;
-        tooltip.style.left = x + 'px';
-        tooltip.style.top  = y + 'px';
-      });
-      layer.on('mouseout', function() {
-        geoLayer.resetStyle(this);
-        if (tooltip) tooltip.style.display = 'none';
-      });
-    }
-
-    const geoLayer = L.geoJSON(geo, {
-      style: styleFeature,
-      onEachFeature: onEach,
-    }).addTo(map);
-    _mapGeoLayer = geoLayer;
-
-    // Fit with extra padding so tracts aren't clipped at the edges
-    const defaultBounds = geoLayer.getBounds();
-    map.setView([40.7128, -73.9], 10);
-
-    // County filter
-    const bar = document.querySelector('.dac-map-county-bar');
-    if (bar) {
-      bar.addEventListener('click', function(e) {
-        const btn = e.target.closest('.dac-map-county-btn');
-        if (!btn) return;
-        const county = btn.dataset.county || null;
-        _mapState.county = county;
-        bar.querySelectorAll('.dac-map-county-btn').forEach(b => {
-          b.classList.toggle('active', (b.dataset.county || null) === county);
-        });
-        geoLayer.setStyle(styleFeature);
-        if (county) {
-          const filtered = [];
-          geoLayer.eachLayer(l => {
-            if (l.feature.properties.County === county) filtered.push(l);
-          });
-          if (filtered.length) {
-            const group = L.featureGroup(filtered);
-            map.flyToBounds(group.getBounds(), { padding: [5, 5], duration: 0.5 });
-          }
-        } else {
-          map.flyToBounds(defaultBounds, { padding: [5, 5], duration: 0.5 });
-        }
-      });
-    }
-  }
-
-
 
   /**
    * Compute the data for the 3 executive header cards (top of the page).
@@ -1762,7 +1631,7 @@
         <div class="exec-shares-grid" id="exec-shares-grid">
           ${renderDumbbell(baseline, year, sections)}
           ${renderStripWithGap(baseline, year, sections)}
-          ${renderDACMap(baseline, year, sections)}
+          ${renderRadar(baseline, year, sections)}
         </div>
       </div>
     `;
@@ -1849,7 +1718,6 @@
     wireBaselineToggle();
     wireExecutiveTooltips();
     wireHeaderCardsTooltips();
-    mountDACMap();   // async – mounts Leaflet after HTML is in DOM
   }
 
   // ============================================================
