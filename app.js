@@ -107,29 +107,117 @@
        * Persist a full set of rows for a table/year and record one history
        * entry describing the changes vs the previous state.
        *
-       * @param {string} tableId  e.g. 'B2'
-       * @param {string} year     e.g. '2025'
-       * @param {Array<Array>} newRows  the rows array (no header — body only when schema_by_year is used)
-       * @param {{name: string, email: string, oldRows: Array<Array>}} ctx
-       * @returns {Object} the history entry that was written
+       * History entry shape:
+       *   {
+       *     ts, user, email, tableId, year,
+       *     changes: [
+       *       { kind: 'cell',    rowIdx, colIdx, colLabel, rowLabel, oldVal, newVal },
+       *       { kind: 'added',   rowIdx, newRow: [...] },
+       *       { kind: 'deleted', rowIdx, oldRow: [...] }
+       *     ]
+       *   }
+       *
+       * @param {string} tableId
+       * @param {string} year
+       * @param {Array<Array>} newRows
+       * @param {{name, email, oldRows, schema}} ctx
        */
       saveTable(tableId, year, newRows, ctx) {
         ctx = ctx || {};
         const overrides = readJSON(OVERRIDES_KEY, {});
         const oldRows = ctx.oldRows || overrides[overrideKey(tableId, year)] || [];
+        const schema = ctx.schema || [];
 
-        // Compute cell-level diff so history can be granular.
+        // ---- Detect row-level adds/deletes -----------------------------
+        // Heuristic: pair rows by their first-cell label. If a label exists
+        // in only one side, it's an add or delete.
+        const oldLabels = oldRows.map(r => (r && r[0] != null) ? String(r[0]) : '');
+        const newLabels = newRows.map(r => (r && r[0] != null) ? String(r[0]) : '');
+
+        const oldByLabel = {};
+        oldLabels.forEach((lbl, i) => {
+          if (lbl) (oldByLabel[lbl] = oldByLabel[lbl] || []).push(i);
+        });
+        const newByLabel = {};
+        newLabels.forEach((lbl, i) => {
+          if (lbl) (newByLabel[lbl] = newByLabel[lbl] || []).push(i);
+        });
+
         const changes = [];
-        const rowCount = Math.max(oldRows.length, newRows.length);
-        for (let r = 0; r < rowCount; r++) {
+
+        // Deleted rows: in oldByLabel but not in newByLabel (or fewer instances)
+        Object.keys(oldByLabel).forEach(lbl => {
+          const oldIdxs = oldByLabel[lbl] || [];
+          const newIdxs = newByLabel[lbl] || [];
+          for (let k = newIdxs.length; k < oldIdxs.length; k++) {
+            changes.push({ kind: 'deleted', rowIdx: oldIdxs[k], oldRow: oldRows[oldIdxs[k]] });
+          }
+        });
+
+        // Added rows: in newByLabel but not in oldByLabel (or more instances)
+        Object.keys(newByLabel).forEach(lbl => {
+          const oldIdxs = oldByLabel[lbl] || [];
+          const newIdxs = newByLabel[lbl] || [];
+          for (let k = oldIdxs.length; k < newIdxs.length; k++) {
+            changes.push({ kind: 'added', rowIdx: newIdxs[k], newRow: newRows[newIdxs[k]] });
+          }
+        });
+
+        // Cell-level diff for rows that exist in BOTH old and new (by label).
+        // Pair them up in encounter order.
+        const pairedOld = new Set();
+        const pairedNew = new Set();
+        Object.keys(oldByLabel).forEach(lbl => {
+          const oIdxs = oldByLabel[lbl] || [];
+          const nIdxs = newByLabel[lbl] || [];
+          const n = Math.min(oIdxs.length, nIdxs.length);
+          for (let i = 0; i < n; i++) {
+            const oi = oIdxs[i], ni = nIdxs[i];
+            pairedOld.add(oi);
+            pairedNew.add(ni);
+            const oRow = oldRows[oi] || [];
+            const nRow = newRows[ni] || [];
+            const colCount = Math.max(oRow.length, nRow.length);
+            for (let c = 1; c < colCount; c++) {   // skip col 0 (label) — covered by pairing
+              const oVal = oRow[c];
+              const nVal = nRow[c];
+              if (oVal !== nVal) {
+                changes.push({
+                  kind: 'cell',
+                  rowIdx: ni,
+                  colIdx: c,
+                  rowLabel: lbl,
+                  colLabel: schema[c] != null ? String(schema[c]) : '',
+                  oldVal: oVal,
+                  newVal: nVal
+                });
+              }
+            }
+          }
+        });
+
+        // Rows whose label is empty/blank — fall back to positional diff
+        for (let r = 0; r < Math.max(oldRows.length, newRows.length); r++) {
+          if (pairedOld.has(r) || pairedNew.has(r)) continue;
           const oRow = oldRows[r] || [];
           const nRow = newRows[r] || [];
-          const colCount = Math.max(oRow.length, nRow.length);
-          for (let c = 0; c < colCount; c++) {
-            const oVal = oRow[c];
-            const nVal = nRow[c];
-            if (oVal !== nVal) {
-              changes.push({ rowIdx: r, colIdx: c, oldVal: oVal, newVal: nVal });
+          const oLabel = oRow[0];
+          const nLabel = nRow[0];
+          if (!oLabel && !nLabel) {
+            // Both blank-labeled — positional cell diff
+            const colCount = Math.max(oRow.length, nRow.length);
+            for (let c = 0; c < colCount; c++) {
+              if (oRow[c] !== nRow[c]) {
+                changes.push({
+                  kind: 'cell',
+                  rowIdx: r,
+                  colIdx: c,
+                  rowLabel: '(unlabeled)',
+                  colLabel: schema[c] != null ? String(schema[c]) : '',
+                  oldVal: oRow[c],
+                  newVal: nRow[c]
+                });
+              }
             }
           }
         }
@@ -4818,6 +4906,78 @@ function wireHTooltips() {
       </div>`;
   }
 
+  /**
+   * Format a single cell value for display in the history detail.
+   * Numbers get locale formatting; strings are escaped.
+   */
+  function fmtHistoryVal(v) {
+    if (v == null || v === '') return '<em>empty</em>';
+    if (typeof v === 'number') return v.toLocaleString();
+    return escapeHtml(String(v));
+  }
+
+  /**
+   * Build the inner HTML for the expanded change-detail list.
+   * Groups changes by kind: deleted rows, added rows, then cell edits.
+   */
+  function renderChangeDetail(changes) {
+    if (!changes || changes.length === 0) {
+      return '<p class="ingest-history-empty" style="margin:6px 0 0">(No granular changes recorded.)</p>';
+    }
+
+    const adds    = changes.filter(c => c.kind === 'added');
+    const deletes = changes.filter(c => c.kind === 'deleted');
+    const cells   = changes.filter(c => c.kind === 'cell' || c.kind == null);   // legacy entries have no `kind`
+
+    let html = '<ul class="ingest-history-detail">';
+
+    deletes.forEach(c => {
+      const label = (c.oldRow && c.oldRow[0] != null) ? String(c.oldRow[0]) : '(unlabeled)';
+      html += `<li class="ingest-history-detail-del">
+        <span class="ingest-history-detail-tag">REMOVED</span>
+        <span class="ingest-history-detail-text">Row "${escapeHtml(label)}"</span>
+      </li>`;
+    });
+
+    adds.forEach(c => {
+      const label = (c.newRow && c.newRow[0] != null) ? String(c.newRow[0]) : '(unlabeled)';
+      html += `<li class="ingest-history-detail-add">
+        <span class="ingest-history-detail-tag">ADDED</span>
+        <span class="ingest-history-detail-text">Row "${escapeHtml(label)}"</span>
+      </li>`;
+    });
+
+    cells.forEach(c => {
+      const rowLbl = c.rowLabel ? escapeHtml(String(c.rowLabel)) : '(row ' + (c.rowIdx + 1) + ')';
+      const colLbl = c.colLabel ? escapeHtml(String(c.colLabel)) : '(col ' + (c.colIdx + 1) + ')';
+      html += `<li class="ingest-history-detail-edit">
+        <span class="ingest-history-detail-tag">EDIT</span>
+        <span class="ingest-history-detail-text">
+          <strong>${rowLbl}</strong> · ${colLbl}:
+          <span class="ingest-history-old">${fmtHistoryVal(c.oldVal)}</span>
+          <span class="ingest-history-arrow">→</span>
+          <span class="ingest-history-new">${fmtHistoryVal(c.newVal)}</span>
+        </span>
+      </li>`;
+    });
+
+    html += '</ul>';
+    return html;
+  }
+
+  /** Build the short summary text shown in the collapsed view. */
+  function buildHistorySummary(changes) {
+    if (!changes || changes.length === 0) return 'No changes';
+    const adds    = changes.filter(c => c.kind === 'added').length;
+    const deletes = changes.filter(c => c.kind === 'deleted').length;
+    const cells   = changes.filter(c => c.kind === 'cell' || c.kind == null).length;
+    const parts = [];
+    if (cells > 0)   parts.push(`${cells} cell${cells   !== 1 ? 's' : ''} edited`);
+    if (adds > 0)    parts.push(`${adds} row${adds      !== 1 ? 's' : ''} added`);
+    if (deletes > 0) parts.push(`${deletes} row${deletes !== 1 ? 's' : ''} removed`);
+    return parts.length > 0 ? parts.join(', ') : `${changes.length} changes`;
+  }
+
   /** History strip below the editor. */
   function renderIngestHistory() {
     const i = state.ingest;
@@ -4830,25 +4990,47 @@ function wireHTooltips() {
       </div>`;
     }
 
-    const entries = history.slice(0, 10).map(entry => {
-      const changeCount = entry.changes ? entry.changes.length : 0;
+    const showAll = state.ingest.historyShowAll === true;
+    const visible = showAll ? history : history.slice(0, 10);
+
+    const entries = visible.map((entry, idx) => {
       const ts = new Date(entry.ts);
       const tsStr = ts.toLocaleString();
       const ago = formatTimeAgo(entry.ts);
+      const summary = buildHistorySummary(entry.changes);
+      const detailHtml = renderChangeDetail(entry.changes);
+
       return `<li class="ingest-history-entry">
         <div class="ingest-history-meta">
-          <span class="ingest-history-who"><strong>${escapeHtml(entry.user)}</strong>${entry.email ? ' <span class="ingest-history-email">&lt;' + escapeHtml(entry.email) + '&gt;</span>' : ''}</span>
+          <span class="ingest-history-who">
+            <strong>${escapeHtml(entry.user)}</strong>${entry.email ? ' <span class="ingest-history-email">&lt;' + escapeHtml(entry.email) + '&gt;</span>' : ''}
+          </span>
           <span class="ingest-history-when" title="${escapeHtml(tsStr)}">${escapeHtml(ago)}</span>
         </div>
         <div class="ingest-history-body">
-          ${changeCount} cell${changeCount !== 1 ? 's' : ''} changed
+          <span class="ingest-history-summary">${summary}</span>
+          <button class="ingest-history-toggle btn-link" type="button" data-idx="${idx}" aria-expanded="false">Show details</button>
+        </div>
+        <div class="ingest-history-detail-wrap" id="hist-detail-${idx}" hidden>
+          ${detailHtml}
         </div>
       </li>`;
     }).join('');
 
+    const showAllLink = (!showAll && history.length > 10)
+      ? `<div class="ingest-history-showall-wrap">
+          <button id="ingest-history-showall" class="btn-link" type="button">Show all ${history.length} saves</button>
+        </div>`
+      : (showAll && history.length > 10)
+        ? `<div class="ingest-history-showall-wrap">
+            <button id="ingest-history-showless" class="btn-link" type="button">Show recent 10 only</button>
+          </div>`
+        : '';
+
     return `<div class="ingest-history">
       <h4>Change history <span class="ingest-history-count">(${history.length} save${history.length !== 1 ? 's' : ''})</span></h4>
       <ul class="ingest-history-list">${entries}</ul>
+      ${showAllLink}
     </div>`;
   }
 
@@ -4905,6 +5087,7 @@ function wireHTooltips() {
     }
 
     wireIngestEditor();
+    wireIngestHistory();
 
     // Add year button
     const addYearBtn = document.getElementById('ingest-add-year');
@@ -5157,7 +5340,9 @@ function wireHTooltips() {
 
       // Persist
       Storage.saveTable(i.tableId, i.year, clone2D(i.draft), {
-        name, email, oldRows: clone2D(i.baseline)
+        name, email,
+        oldRows: clone2D(i.baseline),
+        schema: i.schema ? i.schema.slice() : []
       });
 
       // Apply to live payload so dashboard updates immediately
@@ -5200,6 +5385,39 @@ function wireHTooltips() {
     const mount = document.getElementById('ingest-history-mount');
     if (!mount) return;
     mount.innerHTML = renderIngestHistory();
+    wireIngestHistory();
+  }
+
+  /** Wire collapsible toggle buttons and show-all link. */
+  function wireIngestHistory() {
+    // Toggle individual entry details
+    document.querySelectorAll('.ingest-history-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = btn.dataset.idx;
+        const wrap = document.getElementById('hist-detail-' + idx);
+        if (!wrap) return;
+        const isOpen = !wrap.hidden;
+        wrap.hidden = isOpen;
+        btn.textContent = isOpen ? 'Show details' : 'Hide details';
+        btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      });
+    });
+
+    // Show all / show less
+    const showAllBtn = document.getElementById('ingest-history-showall');
+    if (showAllBtn) {
+      showAllBtn.addEventListener('click', () => {
+        state.ingest.historyShowAll = true;
+        rerenderIngestHistory();
+      });
+    }
+    const showLessBtn = document.getElementById('ingest-history-showless');
+    if (showLessBtn) {
+      showLessBtn.addEventListener('click', () => {
+        state.ingest.historyShowAll = false;
+        rerenderIngestHistory();
+      });
+    }
   }
 
   // Compatibility: keep the old function name pointing to the new page
