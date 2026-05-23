@@ -6080,3 +6080,72 @@ a.nav-item { text-decoration: none; }
 
 .j-yoy-pill-neutral { background: var(--white-smoke); color: var(--text-3); }
 
+/* ── Section I ── */
+.i-pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.i-pill-up      { background: var(--green-tint); color: var(--green); }
+.i-pill-down    { background: var(--red-tint);   color: var(--red);   }
+.i-pill-neutral { background: var(--white-smoke); color: var(--text-3); }
+
+.i-funnel { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+
+.i-funnel-stage { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 8px; padding: 4px; border-radius: 4px; }
+.i-funnel-stage:hover { background: var(--bright-snow); }
+
+.i-funnel-row-label { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.i-funnel-label { font-size: 11px; font-weight: 600; color: var(--text-2); text-align: right; white-space: nowrap; }
+
+.i-funnel-bar-wrap { position: relative; height: 26px; background: var(--white-smoke); border-radius: 4px; overflow: hidden; }
+.i-fbar { position: absolute; top: 0; left: 0; height: 100%; border-radius: 5px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; }
+.i-bar-prev { background: var(--pale-sky); z-index: 1; }
+.i-bar-curr { background: var(--dusk); z-index: 2; }
+.i-bar-curr span { font-size: 11px; font-weight: 700; color: var(--white); }
+
+.i-funnel-conv { font-size: 10px; color: var(--text-3); text-align: center; margin: 0 0 0 104px; }
+
+.i-rates { display: flex; flex-direction: column; gap: 1.1rem; margin-top: 8px; }
+
+.i-rate-section { display: flex; flex-direction: column; gap: 6px; }
+.i-rate-section-label { font-size: 12px; font-weight: 500; color: var(--text-1); }
+
+.i-rate-bar-row { display: grid; grid-template-columns: 32px 1fr 36px auto; align-items: center; gap: 8px; }
+.i-rate-yr  { font-size: 10px; color: var(--text-3); text-align: right; }
+.i-rate-track { height: 18px; background: var(--white-smoke); border-radius: 3px; overflow: hidden; }
+.i-rate-fill { height: 100%; border-radius: 3px; }
+.i-fill-prev { background: var(--pale-sky); }
+.i-fill-curr { background: var(--dusk); }
+.i-rate-pct  { font-size: 11px; font-weight: 600; color: var(--text-2); }
+
+/* ── Section I ── */
+.i-pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.i-pill-up      { background: var(--green-tint); color: var(--green); }
+.i-pill-down    { background: var(--red-tint);   color: var(--red);   }
+.i-pill-neutral { background: var(--white-smoke); color: var(--text-3); }
+
+.i-funnel { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 4px; }
+
+.i-funnel-stage { display: grid; grid-template-columns: 72px 1fr 80px; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 6px; }
+.i-funnel-stage:hover { background: var(--bright-snow); }
+
+.i-funnel-label { font-size: 11px; font-weight: 600; color: var(--text-2); text-align: right; white-space: nowrap; }
+.i-funnel-pill-col { display: flex; justify-content: flex-end; }
+
+.i-funnel-bar-wrap { position: relative; height: 38px; background: var(--white-smoke); border-radius: 5px; overflow: hidden; }
+.i-funnel-bar { position: absolute; top: 0; left: 0; height: 100%; border-radius: 5px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; }
+.i-bar-prev { background: var(--dusk); opacity: 0.4; z-index: 1; }
+.i-bar-curr { background: var(--dusk); z-index: 2; }
+.i-bar-curr span { font-size: 12px; font-weight: 700; color: var(--white); }
+
+.i-rates { display: flex; flex-direction: column; gap: 1.1rem; margin-top: 8px; }
+
+.i-rate-section { display: flex; flex-direction: column; gap: 6px; }
+.i-rate-section-label { font-size: 12px; font-weight: 500; color: var(--text-1); }
+
+.i-rate-bar-row { display: grid; grid-template-columns: 32px 1fr 36px 90px; align-items: center; gap: 8px; }
+.i-rate-yr    { font-size: 10px; color: var(--text-3); text-align: right; }
+.i-rate-track { height: 18px; background: var(--white-smoke); border-radius: 3px; overflow: hidden; }
+.i-rate-fill  { height: 100%; border-radius: 3px; }
+.i-fill-curr  { background: var(--dusk); }
+.i-fill-prev  { background: var(--pale-sky); }
+.i-rate-pct   { font-size: 11px; font-weight: 600; color: var(--text-2); }
+.i-rate-pill-col { display: flex; justify-content: flex-start; }
+

@@ -1477,7 +1477,7 @@
           '<div class="dac-tt-row"><span>Elec. adj.</span><span class="dac-tt-v">' + eAdj + '</span></div>' +
           '<div class="dac-tt-row"><span>Gas adj.</span><span class="dac-tt-v">' + gAdj + '</span></div>' +
           '<div class="dac-tt-row"><span>Elec. accts</span><span class="dac-tt-v">' + eAccts + '</span></div>';
-        tooltip.style.display = 'block';
+        tooltip.style.opacity = '1';
       });
       layer.on('mousemove', function(e) {
         if (!tooltip || !tooltipWrapper) return;
@@ -1495,7 +1495,7 @@
       });
       layer.on('mouseout', function() {
         geoLayer.resetStyle(this);
-        if (tooltip) tooltip.style.display = 'none';
+        if (tooltip) tooltip.style.opacity = '0';
       });
     }
 
@@ -3413,26 +3413,276 @@ function renderSectionH() {
     }
 
 function renderSectionI() {
+    const p = state.payload;
+    const yr = state.year;
+    const prevYr = prevYearOf(yr);
+    const hasPrev = !!prevYr;
+
+    const getVal = (year, rowIdx) => {
+      const t = p.tables['I1'];
+      if (!t || !t.data || !t.data[year] || !t.data[year][rowIdx]) return null;
+      const v = t.data[year][rowIdx][1];
+      return typeof v === 'number' ? v : null;
+    };
+
+    const enrolled  = getVal(yr, 3);
+    const graduates = getVal(yr, 4);
+    const placed    = getVal(yr, 5);
+    const pEnrolled  = hasPrev ? getVal(prevYr, 3) : null;
+    const pGraduates = hasPrev ? getVal(prevYr, 4) : null;
+    const pPlaced    = hasPrev ? getVal(prevYr, 5) : null;
+
+    const gradRate   = enrolled  > 0 ? Math.round(graduates / enrolled  * 100) : 0;
+    const placeRate  = graduates > 0 ? Math.round(placed    / graduates * 100) : 0;
+    const pGradRate  = (pEnrolled  && pGraduates) ? Math.round(pGraduates / pEnrolled  * 100) : null;
+    const pPlaceRate = (pGraduates && pPlaced)    ? Math.round(pPlaced    / pGraduates * 100) : null;
+
+    const yoyPct = (curr, prev) => {
+      if (curr == null || prev == null || prev === 0) return '';
+      const pct = Math.round((curr - prev) / Math.abs(prev) * 100);
+      if (pct === 0) return `<span class="i-pill i-pill-neutral">→ 0% YoY</span>`;
+      const cls = pct > 0 ? 'up' : 'down';
+      const arrow = pct > 0 ? '↑ +' : '↓ ';
+      return `<span class="i-pill i-pill-${cls}">${arrow}${Math.abs(pct)}%</span>`;
+    };
+
+    const ppPill = (curr, prev, lowerBetter) => {
+      if (curr == null || prev == null) return '';
+      const delta = curr - prev;
+      if (delta === 0) return `<span class="i-pill i-pill-neutral">→ 0pp YoY</span>`;
+      const isGood = lowerBetter ? delta < 0 : delta > 0;
+      const cls = isGood ? 'up' : 'down';
+      const sign = delta > 0 ? '+' : '';
+      return `<span class="i-pill i-pill-${cls}">${sign}${delta}pp YoY</span>`;
+    };
+
+    const maxVal = Math.max(enrolled || 0, pEnrolled || 0);
+    const bw = v => v != null && maxVal > 0 ? (v / maxVal * 100).toFixed(1) : 0;
+    const prevYrLabel = prevYr || '';
+
+    const funnelBar = (curr, prev) => {
+      const wCurr = bw(curr);
+      const wPrev = bw(prev);
+      // Barra más corta va al frente para que su label sea visible.
+      // Las barras son semitransparentes para que ambas se vean.
+      const currShorter = curr != null && prev != null ? curr <= prev : true;
+      const currZ = currShorter ? 3 : 2;
+      const prevZ = currShorter ? 2 : 3;
+      const currLabel = curr != null ? curr.toLocaleString() : '—';
+      const prevLabel = prev != null ? prev.toLocaleString() : '';
+      return `
+        ${prev != null ? `<div class="i-fbar" style="width:${wPrev}%;background:var(--pale-sky);z-index:${prevZ};display:flex;align-items:center;justify-content:flex-end;padding-right:4px"><span style="font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap">${prevLabel}</span></div>` : ''}
+        <div class="i-fbar" style="width:${wCurr}%;background:var(--dusk);z-index:${currZ};display:flex;align-items:center;justify-content:flex-end;padding-right:4px"><span style="font-size:12px;font-weight:700;color:var(--white);white-space:nowrap">${currLabel}</span></div>`;
+    };
+
+    // ===== CARD 1 · Funnel =====
+    const card1 = `
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Clean Energy Academy · Funnel</h3>
+            <p class="chart-sub">Student pipeline</p>
+          </div>
+          <div class="chart-legend" style="font-size:9.5px;gap:8px">
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk);width:7px;height:7px;border-radius:50%"></span>${yr}</div>
+            ${hasPrev ? `<div class="legend-item"><span class="legend-swatch" style="background:var(--pale-sky);width:7px;height:7px;border-radius:50%"></span>${prevYrLabel}</div>` : ''}
+          </div>
+        </div>
+
+        <div class="i-funnel">
+
+          <div class="i-funnel-stage"
+            data-tt-label="Enrolled"
+            data-tt-curr="${yr}: ${enrolled != null ? enrolled.toLocaleString() : '—'} students"
+            data-tt-prev="${hasPrev ? prevYrLabel + ': ' + (pEnrolled != null ? pEnrolled.toLocaleString() : '—') + ' students' : ''}"
+            data-tt-delta="${enrolled != null && pEnrolled != null ? 'Change: ' + (enrolled - pEnrolled > 0 ? '+' : '') + (enrolled - pEnrolled) + ' (' + Math.round((enrolled - pEnrolled)/pEnrolled*100) + '% YoY)' : ''}">
+            <div class="i-funnel-label">Enrolled</div>
+            <div class="i-funnel-bar-wrap">${funnelBar(enrolled, pEnrolled)}</div>
+            <div class="i-funnel-pill-col">${yoyPct(enrolled, pEnrolled)}</div>
+          </div>
+
+          <div class="i-funnel-stage"
+            data-tt-label="Graduates"
+            data-tt-curr="${yr}: ${graduates != null ? graduates.toLocaleString() : '—'} graduates"
+            data-tt-prev="${hasPrev ? prevYrLabel + ': ' + (pGraduates != null ? pGraduates.toLocaleString() : '—') + ' graduates' : ''}"
+            data-tt-delta="${graduates != null && pGraduates != null ? 'Change: ' + (graduates - pGraduates > 0 ? '+' : '') + (graduates - pGraduates) + ' (' + Math.round((graduates - pGraduates)/pGraduates*100) + '% YoY)' : ''}"
+            data-tt-rate="${yr} graduation rate: ${gradRate}%">
+            <div class="i-funnel-label">Graduates</div>
+            <div class="i-funnel-bar-wrap">${funnelBar(graduates, pGraduates)}</div>
+            <div class="i-funnel-pill-col">${yoyPct(graduates, pGraduates)}</div>
+          </div>
+
+          <div class="i-funnel-stage"
+            data-tt-label="Job Placements"
+            data-tt-curr="${yr}: ${placed != null ? placed.toLocaleString() : '—'} placements"
+            data-tt-prev="${hasPrev ? prevYrLabel + ': ' + (pPlaced != null ? pPlaced.toLocaleString() : '—') + ' placements' : ''}"
+            data-tt-delta="${placed != null && pPlaced != null ? 'Change: ' + (placed - pPlaced > 0 ? '+' : '') + (placed - pPlaced) + ' (' + Math.round((placed - pPlaced)/pPlaced*100) + '% YoY)' : ''}"
+            data-tt-rate="${yr} placement rate: ${placeRate}% of graduates">
+            <div class="i-funnel-label">Placed</div>
+            <div class="i-funnel-bar-wrap">${funnelBar(placed, pPlaced)}</div>
+            <div class="i-funnel-pill-col">${yoyPct(placed, pPlaced)}</div>
+          </div>
+
+        </div>
+      </div>`;
+
+    // ===== CARD 2 · Rates =====
+    const card2 = `
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Graduation & Placement Rates</h3>
+            <p class="chart-sub">Share of students advancing to the next stage</p>
+          </div>
+        </div>
+
+        <div class="i-rates">
+
+          <div class="i-rate-section">
+            <div class="i-rate-section-label">Graduation rate</div>
+            <div class="i-rate-bar-row"
+              data-tt-label="Graduation rate ${yr}"
+              data-tt-curr="${graduates != null && enrolled != null ? graduates.toLocaleString() + ' graduates / ' + enrolled.toLocaleString() + ' enrolled = ' + gradRate + '%' : ''}"
+              data-tt-delta="${pGradRate != null ? 'vs ' + pGradRate + '% in ' + prevYrLabel + ' (' + (gradRate - pGradRate > 0 ? '+' : '') + (gradRate - pGradRate) + 'pp YoY)' : ''}">
+              <div class="i-rate-yr">${yr}</div>
+              <div class="i-rate-track"><div class="i-rate-fill i-fill-curr" style="width:${gradRate}%"></div></div>
+              <div class="i-rate-pct">${gradRate}%</div>
+              <div class="i-rate-pill-col">${ppPill(gradRate, pGradRate, false)}</div>
+            </div>
+            ${hasPrev ? `
+            <div class="i-rate-bar-row"
+              data-tt-label="Graduation rate ${prevYrLabel}"
+              data-tt-curr="${pGraduates != null && pEnrolled != null ? pGraduates.toLocaleString() + ' graduates / ' + pEnrolled.toLocaleString() + ' enrolled = ' + pGradRate + '%' : ''}">
+              <div class="i-rate-yr">${prevYrLabel}</div>
+              <div class="i-rate-track"><div class="i-rate-fill i-fill-prev" style="width:${pGradRate}%"></div></div>
+              <div class="i-rate-pct">${pGradRate}%</div>
+              <div></div>
+            </div>` : ''}
+          </div>
+
+          <div class="i-rate-section">
+            <div class="i-rate-section-label">Placement rate (of graduates)</div>
+            <div class="i-rate-bar-row"
+              data-tt-label="Placement rate ${yr}"
+              data-tt-curr="${placed != null && graduates != null ? placed.toLocaleString() + ' placed / ' + graduates.toLocaleString() + ' graduates = ' + placeRate + '%' : ''}"
+              data-tt-delta="${pPlaceRate != null ? 'vs ' + pPlaceRate + '% in ' + prevYrLabel + ' (' + (placeRate - pPlaceRate > 0 ? '+' : '') + (placeRate - pPlaceRate) + 'pp YoY)' : ''}">
+              <div class="i-rate-yr">${yr}</div>
+              <div class="i-rate-track"><div class="i-rate-fill i-fill-curr" style="width:${placeRate}%"></div></div>
+              <div class="i-rate-pct">${placeRate}%</div>
+              <div class="i-rate-pill-col">${ppPill(placeRate, pPlaceRate, false)}</div>
+            </div>
+            ${hasPrev ? `
+            <div class="i-rate-bar-row"
+              data-tt-label="Placement rate ${prevYrLabel}"
+              data-tt-curr="${pPlaced != null && pGraduates != null ? pPlaced.toLocaleString() + ' placed / ' + pGraduates.toLocaleString() + ' graduates = ' + pPlaceRate + '%' : ''}">
+              <div class="i-rate-yr">${prevYrLabel}</div>
+              <div class="i-rate-track"><div class="i-rate-fill i-fill-prev" style="width:${pPlaceRate}%"></div></div>
+              <div class="i-rate-pct">${pPlaceRate}%</div>
+              <div></div>
+            </div>` : ''}
+          </div>
+
+        </div>
+      </div>`;
+
+    return `<div class="chart-row cols-2">${card1}${card2}</div>`;
+  }
+
+  function wireISectionTooltips() {
+    let tip = document.querySelector('.exec-tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'exec-tooltip';
+      document.body.appendChild(tip);
+    }
 
     const p = state.payload;
     const yr = state.year;
     const prevYr = prevYearOf(yr);
     const hasPrev = !!prevYr;
-    const hasPrevData = hasPrev;
-    const showCurrent = (yr === p.meta.current_year);
-    const yearLabel = yr;
-    const prevYearLabel = prevYr || '';
-      const placeholder = `
-        <div class="chart-card f-card f-card-empty">
-          <div class="f-empty-content">
-            <div class="f-empty-icon">+</div>
-            <div class="f-empty-text">Coming soon</div>
-            <div class="f-empty-sub">Additional analysis in progress</div>
-          </div>
-        </div>`;
 
-      return `<div class="chart-row cols-1">${placeholder}</div>`;
-    }
+    const getVal = (year, rowIdx) => {
+      const t = p.tables['I1'];
+      if (!t || !t.data || !t.data[year] || !t.data[year][rowIdx]) return null;
+      const v = t.data[year][rowIdx][1];
+      return typeof v === 'number' ? v : null;
+    };
+
+    const enrolled   = getVal(yr, 3);
+    const graduates  = getVal(yr, 4);
+    const placed     = getVal(yr, 5);
+    const pEnrolled  = hasPrev ? getVal(prevYr, 3) : null;
+    const pGraduates = hasPrev ? getVal(prevYr, 4) : null;
+    const pPlaced    = hasPrev ? getVal(prevYr, 5) : null;
+
+    const gradRate   = enrolled  > 0 ? Math.round(graduates / enrolled  * 100) : null;
+    const placeRate  = graduates > 0 ? Math.round(placed    / graduates * 100) : null;
+    const pGradRate  = (pEnrolled  && pGraduates) ? Math.round(pGraduates / pEnrolled  * 100) : null;
+    const pPlaceRate = (pGraduates && pPlaced)    ? Math.round(pPlaced    / pGraduates * 100) : null;
+
+    const fmt = v => v == null ? '—' : v.toLocaleString();
+    const source = 'I1 · Year Totals';
+
+    // % YoY (for counts) — green up, red down
+    const yoyPctRow = (curr, prev) => {
+      if (curr == null || prev == null || prev === 0) return '';
+      const pct = Math.round((curr - prev) / Math.abs(prev) * 100);
+      const color = pct > 0 ? 'var(--green)' : (pct < 0 ? 'var(--red)' : 'var(--text-3)');
+      const sign = pct > 0 ? '+' : '';
+      return `<div class="tt-row"><span>YoY change</span><span class="v" style="color:${color}">${sign}${pct}%</span></div>`;
+    };
+
+    // pp YoY (for rates)
+    const yoyPpRow = (curr, prev) => {
+      if (curr == null || prev == null) return '';
+      const delta = curr - prev;
+      const color = delta > 0 ? 'var(--green)' : (delta < 0 ? 'var(--red)' : 'var(--text-3)');
+      const sign = delta > 0 ? '+' : '';
+      return `<div class="tt-row"><span>YoY change</span><span class="v" style="color:${color}">${sign}${delta}pp</span></div>`;
+    };
+
+    const buildCountTip = (title, curr, prev) => `
+      <div class="tt-name">${title}</div>
+      <div class="tt-row"><span>Source</span><span class="v">${source}</span></div>
+      <div class="tt-row"><span>${title} ${yr}</span><span class="v">${fmt(curr)}</span></div>
+      <div class="tt-row"><span>${title} ${prevYr || ''}</span><span class="v">${fmt(prev)}</span></div>
+      ${yoyPctRow(curr, prev)}
+    `;
+
+    const buildRateTip = (title, curr, prev) => `
+      <div class="tt-name">${title}</div>
+      <div class="tt-row"><span>Source</span><span class="v">${source}</span></div>
+      <div class="tt-row"><span>${title} ${yr}</span><span class="v">${curr != null ? curr + '%' : '—'}</span></div>
+      <div class="tt-row"><span>${title} ${prevYr || ''}</span><span class="v">${prev != null ? prev + '%' : '—'}</span></div>
+      ${yoyPpRow(curr, prev)}
+    `;
+
+    const tipFor = (el) => {
+      const label = el.dataset.ttLabel || '';
+      if (label === 'Enrolled')       return buildCountTip('Enrolled',       enrolled,   pEnrolled);
+      if (label === 'Graduates')      return buildCountTip('Graduates',      graduates,  pGraduates);
+      if (label === 'Job Placements') return buildCountTip('Job Placements', placed,     pPlaced);
+      if (label.startsWith('Graduation rate')) return buildRateTip('Graduation rate', gradRate, pGradRate);
+      if (label.startsWith('Placement rate'))  return buildRateTip('Placement rate',  placeRate, pPlaceRate);
+      return '';
+    };
+
+    document.querySelectorAll('.i-funnel-stage[data-tt-label], .i-rate-bar-row[data-tt-label]').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const html = tipFor(el);
+        if (!html) return;
+        tip.innerHTML = html;
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mousemove', e => {
+        tip.style.left = (e.pageX + 14) + 'px';
+        tip.style.top  = (e.pageY - 10) + 'px';
+      });
+      el.addEventListener('mouseleave', () => {
+        tip.style.opacity = '0';
+      });
+    });
+  }
 
 function renderSectionJ() {
 
@@ -4668,6 +4918,7 @@ function wireHTooltips() {
     if (letter === 'D') wireDTooltips();
     if (letter === 'F' || letter === 'H') wireFTooltips();
     if (letter === 'H') wireHTooltips();
+    if (letter === 'I') wireISectionTooltips();
 
     wireYearToggles(state, rerenderTables);
   }
