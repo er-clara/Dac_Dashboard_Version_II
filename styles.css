@@ -6149,3 +6149,20 @@ a.nav-item { text-decoration: none; }
 .i-rate-pct   { font-size: 11px; font-weight: 600; color: var(--text-2); }
 .i-rate-pill-col { display: flex; justify-content: flex-start; }
 
+/* ── Section H · Total YoY pill (next to borough total) ── */
+.h-yoy-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+  margin-left: 6px;
+  min-width: 56px;
+  text-align: center;
+}
+.h-yoy-pill.h-yoy-up      { background: var(--green-tint); color: var(--green); }
+.h-yoy-pill.h-yoy-down    { background: var(--red-tint);   color: var(--red); }
+.h-yoy-pill.h-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
+

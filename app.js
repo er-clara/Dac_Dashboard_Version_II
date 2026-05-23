@@ -1965,9 +1965,6 @@
 
   // ------------------------------------------------------------
   // SECTION A · Clean Energy
-  //   - Programs ranked by Incentive Spend (top 8)
-  //   - Programs ranked by Energy Savings (top 8)
-  //   - Equity Quadrant ($ or MMBtu)
   // ------------------------------------------------------------
   function renderSectionA() {
     const p = state.payload;
@@ -2174,8 +2171,6 @@
 
   // ------------------------------------------------------------
   // SECTION B · EV Make-Ready Program
-  //   - Card 1: Funding Spent (DAC / Non-DAC / Total) with YoY
-  //   - Card 2: DAC vs Non-DAC tornado
   // ------------------------------------------------------------
   function renderSectionB() {
     const p = state.payload;
@@ -2402,6 +2397,9 @@
   }
 
 
+// ------------------------------------------------------------
+// SECTION C · Demand Response
+// ------------------------------------------------------------
 function renderSectionC() {
 
     const p = state.payload;
@@ -2726,6 +2724,9 @@ function renderSectionC() {
       return `<div class="c-row">${card1}${card2}</div>`;
     }
 
+// ------------------------------------------------------------
+// SECTION D · Distributed Energy Resources
+// ------------------------------------------------------------
 function renderSectionD() {
 
     const p = state.payload;
@@ -2976,6 +2977,9 @@ function renderSectionD() {
       return `<div class="chart-row cols-3">${card1}${card2}${card3}</div>`;
     }
 
+// ------------------------------------------------------------
+// SECTION E · Strategic Capital Investments
+// ------------------------------------------------------------
 function renderSectionE() {
 
     const p = state.payload;
@@ -3102,6 +3106,9 @@ function renderSectionE() {
       return `<div class="chart-row cols-2">${card1}${card2}</div>`;
     }
 
+// ------------------------------------------------------------
+// SECTION F · Customer Outages
+// ------------------------------------------------------------
 function renderSectionF() {
 
     const p = state.payload;
@@ -3191,7 +3198,7 @@ function renderSectionF() {
           <div class="chart-card-head">
             <div>
               <h3>Customers Interrupted by Borough</h3>
-              <p class="chart-sub">DAC vs Non-DAC per borough · ${yearLabel}</p>
+              <p class="chart-sub">DAC vs Non-DAC per borough · YoY change shown for DAC repairs</p>
             </div>
             <div class="chart-legend">
               <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk)"></span>DAC</div>
@@ -3215,6 +3222,9 @@ function renderSectionF() {
       return `<div class="chart-row cols-2">${placeholder}${card3}</div>`;
     }
 
+// ------------------------------------------------------------
+// SECTION G · Main Replacement Program
+// ------------------------------------------------------------
 function renderSectionG() {
 
     const p = state.payload;
@@ -3237,6 +3247,9 @@ function renderSectionG() {
       return `<div class="chart-row cols-2">${placeholder}${placeholder}</div>`;
     }
 
+// ------------------------------------------------------------
+// SECTION H · Leak Repairs
+// ------------------------------------------------------------
 function renderSectionH() {
 
     const p = state.payload;
@@ -3282,6 +3295,13 @@ function renderSectionH() {
       const card2Rows = boroughRows.map(b => {
         const dacYoy = yoyCalc(b.dac, b.prevDac);
         const nonYoy = yoyCalc(b.nondac, b.prevNon);
+        const dacYoyPill = dacYoy === null
+          ? ''
+          : (dacYoy === 0
+            ? `<span class="h-yoy-pill h-yoy-neutral">→ 0%</span>`
+            : (dacYoy > 0
+              ? `<span class="h-yoy-pill h-yoy-down">↑ +${dacYoy}%</span>`
+              : `<span class="h-yoy-pill h-yoy-up">↓ ${Math.abs(dacYoy)}%</span>`));
         return `
           <div class="f3-borough"
             data-name="${b.name}"
@@ -3306,6 +3326,7 @@ function renderSectionH() {
                 </div>
               </div>
               <span class="f3-borough-total">${fmtCompact(b.total)}</span>
+              ${dacYoyPill}
             </div>
           </div>`;
       }).join('');
@@ -3315,7 +3336,7 @@ function renderSectionH() {
           <div class="chart-card-head">
             <div>
               <h3>Leak Repairs by Borough</h3>
-              <p class="chart-sub">DAC vs Non-DAC per borough · ${yearLabel}</p>
+              <p class="chart-sub">DAC vs Non-DAC per borough · YoY change shown for DAC repairs</p>
             </div>
             <div class="chart-legend">
               <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk)"></span>DAC</div>
@@ -3399,7 +3420,7 @@ function renderSectionH() {
           <div class="chart-card-head">
             <div>
               <h3>Repairs Distribution Across Boroughs</h3>
-              <p class="chart-sub">DAC vs Non-DAC repair split · ${yearLabel}</p>
+              <p class="chart-sub">DAC vs Non-DAC repair split</p>
             </div>
             <div class="chart-legend">${legendHtml}</div>
           </div>
@@ -3412,6 +3433,9 @@ function renderSectionH() {
       return `<div class="chart-row h-row-3-2">${card2}${card3}</div>`;
     }
 
+// ------------------------------------------------------------
+// SECTION I · Clean Energy Jobs
+// ------------------------------------------------------------
 function renderSectionI() {
     const p = state.payload;
     const yr = state.year;
@@ -3684,6 +3708,9 @@ function renderSectionI() {
     });
   }
 
+// ------------------------------------------------------------
+// SECTION J · Customer Operations
+// ------------------------------------------------------------
 function renderSectionJ() {
 
     const p = state.payload;
