@@ -4676,6 +4676,7 @@
         "notes": ""
       },
       "header_levels": 2,
+      "currency_cols": [1, 2, 3, 4],
       "schema_by_year": {
         "2025": [
           "",
@@ -10500,9 +10501,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J1. Residential Electric Usage  |  Main  |  PDF page 53",
-        "2023": "Table J1. 2023 Residential Electric Usage - April-December 2023  |  Main  |  PDF page 46",
-        "2025": "Table J1. Residential Electric Usage – 2025"
+        "2024": "Table J1. Residential Electric Usage",
+        "2023": "Table J1. Residential Electric Usage",
+        "2025": "Table J1. Residential Electric Usage"
       },
       "mapping": {
         "status": "SAME",
@@ -10589,9 +10590,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J2. Residential Gas Usage  |  Main  |  PDF page 53",
-        "2023": "Table J2. 2023 Residential Gas Usage - April-December 2023  |  Main  |  PDF page 46",
-        "2025": "Table J2. Residential Gas Usage – 2025"
+        "2024": "Table J2. Residential Gas Usage",
+        "2023": "Table J2. Residential Gas Usage",
+        "2025": "Table J2. Residential Gas Usage"
       },
       "mapping": {
         "status": "SAME",
@@ -10685,9 +10686,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J3. Unpaid Residential Accounts That Were 60 to 90 Days Overdue   |  Main  |  PDF page 53",
-        "2023": "Table J3. 2023 Unpaid Residential Accounts That Are 60 to 90 Days Overdue as of 12/31/2023  |  Main  |  PDF page 47",
-        "2025": "Table J3. Unpaid Residential Accounts That Were 60 to 90 Days Overdue as of 12/31/2025"
+        "2024": "Table J3. Unpaid Residential Accounts That Were 60 to 90 Days Overdue",
+        "2023": "Table J3. Unpaid Residential Accounts That Are 60 to 90 Days Overdue",
+        "2025": "Table J3. Unpaid Residential Accounts That Were 60 to 90 Days Overdue"
       },
       "mapping": {
         "status": "SAME",
@@ -10781,9 +10782,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J4. Unpaid Residential Accounts That Were 90 Or More Days Overdue  |  Main  |  PDF page 54",
-        "2023": "Table J4. 2024 Unpaid Residential Accounts That Are 90 Or More Days Overdue as of 12/31/2023  |  Main  |  PDF page 47",
-        "2025": "Table J4. Unpaid Residential Accounts That Were 90 Or More Days Overdue as of 12/31/2025"
+        "2024": "Table J4. Unpaid Residential Accounts That Were 90 Or More Days Overdue",
+        "2023": "Table J4. Unpaid Residential Accounts That Were 90 Or More Days Overdue",
+        "2025": "Table J4. Unpaid Residential Accounts That Were 90 Or More Days Overdue"
       },
       "mapping": {
         "status": "SAME",
@@ -10870,9 +10871,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J5. Residential Service Disconnects and Restorations  |  Main  |  PDF page 54",
-        "2023": "Table J5. 2023 Residential Service Disconnects and Restorations – April-December 2023  |  Main  |  PDF page 47",
-        "2025": "Table J5. Residential Service Disconnects and Restorations – 2025"
+        "2024": "Table J5. Residential Service Disconnects and Restorations",
+        "2023": "Table J5. Residential Service Disconnects and Restorations",
+        "2025": "Table J5. Residential Service Disconnects and Restorations"
       },
       "mapping": {
         "status": "SAME",
@@ -10966,9 +10967,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J6. Residential Customers with DPAs   |  Main  |  PDF page 54",
-        "2023": "Table J6.2023  Residential Customers With DPAs as of 12/31/2023  |  Main  |  PDF page 47",
-        "2025": "Table J6. Residential Customers with DPAs as of 12/31/2025"
+        "2024": "Table J6. Residential Customers with DPAs",
+        "2023": "Table J6. Residential Customers With DPAs",
+        "2025": "Table J6. Residential Customers with DPAs"
       },
       "mapping": {
         "status": "SAME",
@@ -11062,9 +11063,9 @@
         ]
       },
       "title_by_year": {
-        "2024": "Table J7. Number of Customers Enrolled in the Energy Affordability Program   |  Main  |  PDF page 54",
-        "2023": "Table J7. 2023Number of Customers Enrolled in the Energy Affordability Program as of 12/31/2023  |  Main  |  PDF page 48",
-        "2025": "Table J7. Number of Customers Enrolled in the Energy Affordability Program as of 12/31/2025"
+        "2024": "Table J7. Number of Customers Enrolled in the Energy Affordability Program",
+        "2023": "Table J7. Number of Customers Enrolled in the Energy Affordability Program",
+        "2025": "Table J7. Number of Customers Enrolled in the Energy Affordability Program"
       },
       "mapping": {
         "status": "SAME",
@@ -11133,34 +11134,39 @@
           [
             "Total in DAC",
             128986182,
-            22904198
+            22904198,
+            "62%"
           ],
           [
             "Total in Non-DAC",
             63415143,
-            15691183
+            15691183,
+            "38%"
           ],
           [
             "Total",
             192638756,
-            38743914
+            38743914,
+            "100%"
           ],
           [
             "% of total in DAC",
             "67%",
-            "59%"
+            "59%",
+            null
           ],
           [
             "% of total in non-DAC",
             "33%",
-            "41%"
+            "41%",
+            null
           ]
         ]
       },
       "title_by_year": {
         "2024": "Table J8. Amount Expended for EAP Discounts  |  Main  |  PDF page 55",
-        "2023": "Table J8. Amount Expended for EAP Discounts – April-December 2023  |  Main  |  PDF page 48",
-        "2025": "Table J8. Amount Expended for EAP Discounts – 202492  |  Main  |  PDF page 55"
+        "2023": "Table J8. Amount Expended for EAP Discounts  |  Main  |  PDF page 48",
+        "2025": "Table J8. Amount Expended for EAP Discounts  |  Main  |  PDF page 55"
       },
       "mapping": {
         "status": "SAME",
@@ -11224,8 +11230,8 @@
       },
       "title_by_year": {
         "2024": "Table J9. Total Residential Customers  |  Main  |  PDF page 55",
-        "2023": "Table J9. Total Residential Customers as of 12/31/2023  |  Main  |  PDF page 48",
-        "2025": "Table J9. Total Residential Customers as of 12/31/202493  |  Main  |  PDF page 55"
+        "2023": "Table J9. Total Residential Customers  |  Main  |  PDF page 48",
+        "2025": "Table J9. Total Residential Customers  |  Main  |  PDF page 55"
       },
       "mapping": {
         "status": "SAME",

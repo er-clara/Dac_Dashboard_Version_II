@@ -422,6 +422,15 @@
     return Math.round(v).toLocaleString();
   }
 
+  /** Compact currency: $1.2B, $350M, $12K. */
+  function fmtMoney(v) {
+    if (v === null || v === undefined) return '—';
+    if (Math.abs(v) >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+    if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return '$' + (v / 1e3).toFixed(0) + 'K';
+    return '$' + Math.round(v).toLocaleString();
+  }
+
   /** True if value parses as a number (string or number). */
   function isNumeric(v) {
     if (typeof v === 'number') return true;
@@ -725,6 +734,24 @@
     });
   }
 
+  function detectCurrencyColumns(headerRow) {
+    return headerRow.map(h => {
+      if (h == null) return false;
+      const s = String(h).toLowerCase().trim();
+      return /\$/.test(s) ||
+             /amount/.test(s) ||
+             /expended/.test(s) ||
+             /funding/.test(s) ||
+             /incentive/.test(s) ||
+             /discount/.test(s) ||
+             /electric\s*$/.test(s) ||
+             /^gas\s*$/.test(s) ||
+             /balance/.test(s) ||
+             /investment/.test(s) ||
+             /^20\d\d$/.test(s.trim());
+    });
+  }
+
   /** True if a row has text in column 0 and empty/null in the rest (a sub-header). */
   function isSubheaderRow(row) {
     if (!row || !row[0] || typeof row[0] !== 'string') return false;
@@ -749,6 +776,10 @@
 
     const pctHeader = rows[headerLevels - 1] || rows[0];
     const pctCols = detectPctColumns(pctHeader);
+    const tableCurrCols = opts.tableId && state.payload && state.payload.tables[opts.tableId]
+      ? (state.payload.tables[opts.tableId].currency_cols || [])
+      : [];
+    const currCols = detectCurrencyColumns(pctHeader).map((v, i) => v || tableCurrCols.includes(i));
 
     function formatCell(c, colIdx, rowLabel) {
       if (c == null || c === '') return '';
@@ -757,6 +788,12 @@
         const isPctRow = rowLabel && /^percentage|^%/i.test(String(rowLabel).trim());
         if (pctCols[colIdx] || isPctRow) {
           return (Math.abs(c) <= 1 ? c * 100 : c).toFixed(1) + '%';
+        }
+        if (currCols[colIdx]) {
+          if (Math.abs(c) >= 1e9) return '$' + (c / 1e9).toFixed(2) + 'B';
+          if (Math.abs(c) >= 1e6) return '$' + (c / 1e6).toFixed(1) + 'M';
+          if (Math.abs(c) >= 1e3) return '$' + (c / 1e3).toFixed(0) + 'K';
+          return '$' + c.toLocaleString();
         }
         if (Number.isInteger(c) || Math.abs(c) >= 100) return c.toLocaleString();
         return c.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -2092,7 +2129,7 @@
             </div>
           </div>
           <div class="chart-body">
-            ${stackedBar(top10, { labelW: 200, fmt: fmtCompact, dataAttrs: a1DataAttrs, rowClass: 'a-stacked-row' })}
+            ${stackedBar(top10, { labelW: 200, fmt: fmtMoney, dataAttrs: a1DataAttrs, rowClass: 'a-stacked-row' })}
           </div>
         </div>
         <div class="chart-card">
@@ -3403,11 +3440,9 @@ function renderSectionJ() {
     const yr = state.year;
     const prevYr = prevYearOf(yr);
     const hasPrev = !!prevYr;
-    const hasPrevData = hasPrev;
-    const showCurrent = (yr === p.meta.current_year);
     const yearLabel = yr;
     const prevYearLabel = prevYr || '';
-      // ===== Helper: parse all J tables (J1-J9) into a single object per year =====
+
       const getJData = () => {
         const result = {}; allYears().forEach(y => result[y] = {});
         allYears().forEach(yr => {
@@ -3418,7 +3453,6 @@ function renderSectionJ() {
             if (!t || !t.data || !t.data[yr] || !t.data[yr][rowIdx]) return null;
             const v = t.data[yr][rowIdx][colIdx];
             if (typeof v === 'number') return v;
-            // Accept percentage strings like "66%" → 0.66 (introduced by 2025 data normalization)
             if (typeof v === 'string') {
               const s = v.trim();
               if (s.endsWith('%')) {
@@ -3435,50 +3469,31 @@ function renderSectionJ() {
           d.nondac_customers = get('J9', 0, 3) || 0;
           d.total_customers  = d.dac_customers + d.nondac_customers;
           d.dac_pct          = get('J9', 0, 2) || 0;
-
-          // J1, J2 row 0 = total usage row, row 1 = average row.
-          // For "DAC % of total usage" we read from row 0 (total amounts),
-          // since the average row's % was not always populated in the source.
-          //   schema = ['Metric', 'DAC', 'DAC % of Total', 'Non-DAC', 'Non-DAC % of Total']
-          //   col 1 = DAC value, col 2 = DAC% of total, col 3 = Non-DAC value
           d.elec_total_dac    = get('J1', 0, 1) || 0;
           d.elec_total_nondac = get('J1', 0, 3) || 0;
           d.elec_dac_pct      = get('J1', 0, 2) || 0;
-
           d.gas_total_dac    = get('J2', 0, 1) || 0;
           d.gas_total_nondac = get('J2', 0, 3) || 0;
           d.gas_dac_pct      = get('J2', 0, 2) || 0;
-
-          // J3, J4, J6 — row 0 = DAC, row 1 = Non-DAC (was 1/2 in legacy format)
           d.j4_accts_dac    = get('J4', 0, 1) || 0;
           d.j4_accts_nondac = get('J4', 1, 1) || 0;
           d.j4_accts_pct    = get('J4', 0, 2) || 0;
           d.j4_amt_dac      = get('J4', 0, 3) || 0;
           d.j4_amt_nondac   = get('J4', 1, 3) || 0;
           d.j4_amt_pct      = get('J4', 0, 4) || 0;
-
-          // J5 — row 0 = disconnections, row 1 = restorations
           d.disc_dac    = get('J5', 0, 1) || 0;
           d.disc_pct    = get('J5', 0, 2) || 0;
           d.disc_nondac = get('J5', 0, 3) || 0;
           d.rest_dac    = get('J5', 1, 1) || 0;
           d.rest_pct    = get('J5', 1, 2) || 0;
           d.rest_nondac = get('J5', 1, 3) || 0;
-
-          // J6 — row 0 = DAC, row 1 = Non-DAC
           d.dpa_accts_dac    = get('J6', 0, 1) || 0;
           d.dpa_accts_nondac = get('J6', 1, 1) || 0;
           d.dpa_accts_pct    = get('J6', 0, 2) || 0;
           d.dpa_amt_dac      = get('J6', 0, 3) || 0;
           d.dpa_amt_nondac   = get('J6', 1, 3) || 0;
           d.dpa_amt_pct      = get('J6', 0, 4) || 0;
-
-          // J7 — row 0 = Total in DAC, col 4 = % of Accounts
           d.eap_pct     = get('J7', 0, 4) || 0;
-          // J8 — % of total in DAC:
-          //   2024 format: row 0 col 3 has the value directly (e.g. "62%")
-          //   2025 format: that column is empty; compute from row 0 (DAC totals)
-          //                vs row 2 (grand total) across Electric + Gas
           let eapAmtPct = get('J8', 0, 3);
           if (eapAmtPct == null) {
             const dacElec = get('J8', 0, 1) || 0;
@@ -3509,7 +3524,6 @@ function renderSectionJ() {
       const prev = hasPrev ? jAll[prevYr] : null;
       const prevYearKey = prevYr;
 
-      // Format helpers
       const jPct = v => (v * 100).toFixed(0) + '%';
       const jDeltaPp = (curr, baseline) => {
         const delta = Math.round((curr - baseline) * 100);
@@ -3522,72 +3536,95 @@ function renderSectionJ() {
         return '$' + v.toLocaleString();
       };
 
-      // ===== CARD 1 · Customer Burden vs Population (dumbbell) =====
+      // ── YoY pill helper ──
+      const yoyPill = (curr, prevVal, lowerIsBetter) => {
+        if (curr == null || prevVal == null || prevVal === 0) return '';
+        const pct = Math.round((curr - prevVal) / Math.abs(prevVal) * 100);
+        if (pct === 0) return `<span class="j-yoy-pill j-yoy-pill-neutral">→ 0% YoY</span>`;
+        const isGood = lowerIsBetter ? pct < 0 : pct > 0;
+        const cls = isGood ? 'up' : 'down';
+        const arrow = pct > 0 ? '↑ +' : '↓ ';
+        return `<span class="j-yoy-pill j-yoy-pill-${cls}">${arrow}${Math.abs(pct)}% YoY</span>`;
+      };
+
+      const ppPill = (curr, prevVal, lowerIsBetter) => {
+        if (curr == null || prevVal == null) return '';
+        const delta = Math.round((curr - prevVal) * 100);
+        if (delta === 0) return `<span class="j-yoy-pill j-yoy-pill-neutral">→ 0pp YoY</span>`;
+        const isGood = lowerIsBetter ? delta < 0 : delta > 0;
+        const cls = isGood ? 'up' : 'down';
+        const sign = delta > 0 ? '+' : '';
+        return `<span class="j-yoy-pill j-yoy-pill-${cls}">${sign}${delta}pp YoY</span>`;
+      };
+
+      // ===== CARD 1 · Customer Burden vs Population (HTML rows, not SVG) =====
       const baselinePct = d.dac_pct;
+
       const burdenRows = [
-        { label: 'Pop. share',   curr: d.dac_pct,      prevPct: prev ? prev.dac_pct      : null, type: 'baseline', src: 'J9' },
-        { label: 'Electric use', curr: d.elec_dac_pct, prevPct: prev ? prev.elec_dac_pct : null, type: 'usage',    src: 'J1' },
-        { label: 'Gas use',      curr: d.gas_dac_pct,  prevPct: prev ? prev.gas_dac_pct  : null, type: 'usage',    src: 'J2' },
-        { label: 'Unpaid 90+',   curr: d.j4_accts_pct, prevPct: prev ? prev.j4_accts_pct : null, type: 'burden',   src: 'J4' },
-        { label: 'Disconnects',  curr: d.disc_pct,     prevPct: prev ? prev.disc_pct     : null, type: 'burden',   src: 'J5' },
-        { label: 'EAP enrolled', curr: d.eap_pct,      prevPct: prev ? prev.eap_pct      : null, type: 'assist',   src: 'J7' },
-        { label: 'EAP $',        curr: d.eap_amt_pct,  prevPct: prev ? prev.eap_amt_pct  : null, type: 'assist',   src: 'J8' }
+        { label: 'Pop. share',   curr: d.dac_pct,      prevPct: prev ? prev.dac_pct      : null, type: 'baseline', src: 'J9', lowerBetter: false },
+        { label: 'Electric use', curr: d.elec_dac_pct, prevPct: prev ? prev.elec_dac_pct : null, type: 'usage',    src: 'J1', lowerBetter: false },
+        { label: 'Gas use',      curr: d.gas_dac_pct,  prevPct: prev ? prev.gas_dac_pct  : null, type: 'usage',    src: 'J2', lowerBetter: false },
+        { label: 'Unpaid 90+',   curr: d.j4_accts_pct, prevPct: prev ? prev.j4_accts_pct : null, type: 'burden',   src: 'J4', lowerBetter: true  },
+        { label: 'Disconnects',  curr: d.disc_pct,     prevPct: prev ? prev.disc_pct     : null, type: 'burden',   src: 'J5', lowerBetter: true  },
+        { label: 'EAP enrolled', curr: d.eap_pct,      prevPct: prev ? prev.eap_pct      : null, type: 'assist',   src: 'J7', lowerBetter: false },
+        { label: 'EAP $',        curr: d.eap_amt_pct,  prevPct: prev ? prev.eap_amt_pct  : null, type: 'assist',   src: 'J8', lowerBetter: false },
       ];
 
-      const burdenW = 200, burdenH = 130, padL = 56, padR = 16, padT = 8, padB = 10;
-      const burdenInnerW = burdenW - padL - padR;
-      const burdenBaselineX = padL + baselinePct * burdenInnerW;
-      const burdenRowH = (burdenH - padT - padB) / burdenRows.length;
+      const colorByType = {
+        baseline: 'var(--dusk)',
+        usage:    'var(--pale-sky)',
+        burden:   'var(--red)',
+        assist:   'var(--green)',
+      };
 
-      let burdenSvg = '';
-      burdenSvg += `<line x1="${burdenBaselineX}" y1="${padT}" x2="${burdenBaselineX}" y2="${burdenH-padB+2}" stroke="var(--dusk)" stroke-width="1" stroke-dasharray="3 2" opacity="0.55"/>`;
+      const burdenRowsHtml = burdenRows.map(r => {
+        const color = colorByType[r.type];
+        const pctNum = Math.round(r.curr * 100);
+        const baseNum = Math.round(baselinePct * 100);
+        const pill = r.prevPct !== null ? ppPill(r.curr, r.prevPct, r.lowerBetter) : '';
 
-      burdenRows.forEach((r, i) => {
-        const y = padT + burdenRowH * i + burdenRowH/2;
-        const xCurr = padL + r.curr * burdenInnerW;
-        const xPrev = r.prevPct !== null ? padL + r.prevPct * burdenInnerW : null;
+        // dot positions as % of 100% width
+        const currLeft = (r.curr * 100).toFixed(1);
+        const prevLeft = r.prevPct !== null ? (r.prevPct * 100).toFixed(1) : null;
+        const baseLeft = (baselinePct * 100).toFixed(1);
 
-        let color;
-        if (r.type === 'baseline')      color = 'var(--dusk)';
-        else if (r.type === 'usage')    color = 'var(--pale-sky)';
-        else if (r.type === 'burden')   color = 'var(--red)';
-        else                            color = 'var(--green)';
-
-        const prevValStr = r.prevPct !== null ? jPct(r.prevPct) : 'n/a';
-        const deltaStr = r.prevPct !== null ? jDeltaPp(r.curr, r.prevPct) : '';
-
-        burdenSvg += `<rect class="j-burden-row" x="0" y="${y - burdenRowH/2}" width="${burdenW}" height="${burdenRowH}" fill="transparent"
-          data-label="${r.label}" data-pct="${jPct(r.curr)}" data-baseline="${jPct(baselinePct)}"
-          data-prev="${prevValStr}" data-yoy="${deltaStr}"
-          data-delta="${r.type === 'baseline' ? '' : jDeltaPp(r.curr, baselinePct)}"
-          data-type="${r.type}" data-src="${r.src}" style="cursor:default"/>`;
-
-        burdenSvg += `<text x="${padL-4}" y="${y+1.3}" text-anchor="end" font-size="6.5" fill="var(--text-2)" font-weight="500" pointer-events="none">${r.label}</text>`;
-
-        if (xPrev !== null) {
-          const x1 = Math.min(xCurr, xPrev), x2 = Math.max(xCurr, xPrev);
-          burdenSvg += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${color}" stroke-width="2" opacity="0.35" pointer-events="none"/>`;
-          burdenSvg += `<circle cx="${xPrev}" cy="${y}" r="2.1" fill="${color}" opacity="0.45" pointer-events="none"/>`;
-        }
-        burdenSvg += `<circle cx="${xCurr}" cy="${y}" r="2.3" fill="${color}" pointer-events="none"/>`;
-        burdenSvg += `<text x="${xCurr+3.5}" y="${y+1.3}" font-size="7" fill="${color}" font-weight="600" pointer-events="none">${jPct(r.curr)}</text>`;
-      });
+        return `
+          <div class="j-burden-html-row"
+            data-label="${r.label}"
+            data-pct="${jPct(r.curr)}"
+            data-baseline="${jPct(baselinePct)}"
+            data-prev="${r.prevPct !== null ? jPct(r.prevPct) : 'n/a'}"
+            data-yoy="${r.prevPct !== null ? jDeltaPp(r.curr, r.prevPct) : ''}"
+            data-delta="${r.type === 'baseline' ? '' : jDeltaPp(r.curr, baselinePct)}"
+            data-type="${r.type}" data-src="${r.src}">
+            <div class="j-bhr-label">${r.label}</div>
+            <div class="j-bhr-track">
+              <div class="j-bhr-baseline" style="left:${baseLeft}%"></div>
+              ${prevLeft !== null ? `<div class="j-bhr-dot j-bhr-prev" style="left:${prevLeft}%"></div>` : ''}
+              <div class="j-bhr-dot j-bhr-curr" style="left:${currLeft}%;background:${color}"></div>
+              <span class="j-bhr-pct" style="left:${currLeft}%;color:${color}">${pctNum}%</span>
+            </div>
+            <div class="j-bhr-pill">${pill}</div>
+          </div>`;
+      }).join('');
 
       const card1 = `
         <div class="chart-card">
           <div class="chart-card-head">
             <div>
               <h3>Customer Burden vs Population</h3>
-              <p class="chart-sub">DAC are ${jPct(d.dac_pct)} of customers · ${prev ? prevYearLabel + ' → ' : ''}${yearLabel}</p>
+              <p class="chart-sub">DAC are ${jPct(d.dac_pct)} of customers</p>
+            </div>
+            <div class="chart-legend" style="font-size:9.5px;gap:8px">
+              <div class="legend-item"><span class="j-burden-dot" style="background:var(--dusk);width:7px;height:7px"></span>Baseline</div>
+              <div class="legend-item"><span class="j-burden-dot" style="background:var(--pale-sky);width:7px;height:7px"></span>Usage</div>
+              <div class="legend-item"><span class="j-burden-dot" style="background:var(--red);width:7px;height:7px"></span>Burden</div>
+              <div class="legend-item"><span class="j-burden-dot" style="background:var(--green);width:7px;height:7px"></span>Assistance</div>
+              ${prev ? `<div class="legend-item"><span class="j-burden-dot" style="background:#888;opacity:.55;width:7px;height:7px"></span>${prevYearLabel}</div>` : ''}
             </div>
           </div>
-          <svg viewBox="0 0 ${burdenW} ${burdenH}" class="j-burden-svg">${burdenSvg}</svg>
-          <div class="j-burden-legend">
-            <span><span class="j-burden-dot" style="background:var(--dusk)"></span>Baseline</span>
-            <span><span class="j-burden-dot" style="background:var(--pale-sky)"></span>Usage</span>
-            <span><span class="j-burden-dot" style="background:var(--red)"></span>Burden</span>
-            <span><span class="j-burden-dot" style="background:var(--green)"></span>Assistance</span>
-            ${prev ? `<span style="opacity:.7"><span class="j-burden-dot" style="background:#888;opacity:.45;border-radius:50%"></span>${prevYearLabel}</span>` : ''}
+          <div class="j-burden-html">
+            ${burdenRowsHtml}
           </div>
         </div>`;
 
@@ -3600,15 +3637,22 @@ function renderSectionJ() {
       const prevNonAmt = prev ? prev.j4_amt_nondac : null;
       const yoyDac = (prevDacAmt && prevDacAmt > 0) ? Math.round((d.j4_amt_dac - prevDacAmt) / prevDacAmt * 100) : null;
       const yoyNon = (prevNonAmt && prevNonAmt > 0) ? Math.round((d.j4_amt_nondac - prevNonAmt) / prevNonAmt * 100) : null;
-      const yoyDacStr = yoyDac !== null ? (yoyDac >= 0 ? '↑ +' : '↓ ') + Math.abs(yoyDac) + '%' : null;
-      const yoyNonStr = yoyNon !== null ? (yoyNon >= 0 ? '↑ +' : '↓ ') + Math.abs(yoyNon) + '%' : null;
+
+      const unpaidPill = (yoy, isDAC) => {
+        if (yoy === null) return '';
+        // For arrears: going up is BAD (red), going down is GOOD (green)
+        const isGood = yoy < 0;
+        const cls = isGood ? 'up' : 'down';
+        const arrow = yoy > 0 ? '↑ +' : '↓ ';
+        return `<span class="j-yoy-pill j-yoy-pill-${cls}">${arrow}${Math.abs(yoy)}% YoY</span>`;
+      };
 
       const card2 = `
         <div class="chart-card">
           <div class="chart-card-head">
             <div>
               <h3>Unpaid Residential Accounts · 90+ days</h3>
-              <p class="chart-sub">${fmtBig(totalAmt)} unpaid · oldest debt · ${prev ? prevYearLabel + ' → ' : ''}${yearLabel}</p>
+              <p class="chart-sub">${fmtBig(totalAmt)} unpaid · oldest debt</p>
             </div>
           </div>
           <div class="j-aff-body">
@@ -3621,11 +3665,10 @@ function renderSectionJ() {
               <div class="j-aff-label">DAC</div>
               <div class="j-aff-num-row">
                 <div class="j-aff-num">${fmtBig(d.j4_amt_dac)}</div>
-                ${yoyDacStr ? `
-                <div class="j-aff-yoy">
-                  <span class="j-aff-yoy-val" style="color:${yoyDac >= 0 ? 'var(--red)' : 'var(--green)'}">${yoyDacStr} YoY</span>
-                  <span class="j-aff-yoy-sub">vs ${fmtBig(prevDacAmt)} in ${prevYearKey}</span>
-                </div>` : ''}
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                  ${unpaidPill(yoyDac, true)}
+                  ${prevDacAmt ? `<span class="j-aff-yoy-sub">vs ${fmtBig(prevDacAmt)} in ${prevYearKey}</span>` : ''}
+                </div>
               </div>
               <div class="j-aff-foot">${(dacPct*100).toFixed(0)}% of debt · ${(d.j4_accts_dac/1000).toFixed(0)}k accounts</div>
             </div>
@@ -3639,41 +3682,15 @@ function renderSectionJ() {
               <div class="j-aff-label">Non-DAC</div>
               <div class="j-aff-num-row">
                 <div class="j-aff-num">${fmtBig(d.j4_amt_nondac)}</div>
-                ${yoyNonStr ? `
-                <div class="j-aff-yoy">
-                  <span class="j-aff-yoy-val" style="color:${yoyNon >= 0 ? 'var(--red)' : 'var(--green)'}">${yoyNonStr} YoY</span>
-                  <span class="j-aff-yoy-sub">vs ${fmtBig(prevNonAmt)} in ${prevYearKey}</span>
-                </div>` : ''}
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                  ${unpaidPill(yoyNon, false)}
+                  ${prevNonAmt ? `<span class="j-aff-yoy-sub">vs ${fmtBig(prevNonAmt)} in ${prevYearKey}</span>` : ''}
+                </div>
               </div>
               <div class="j-aff-foot">${((1-dacPct)*100).toFixed(0)}% of debt · ${(d.j4_accts_nondac/1000).toFixed(0)}k accounts</div>
             </div>
 
             <div class="j-aff-note">DAC: more accounts in arrears, not bigger arrears per account</div>
-          </div>
-        </div>`;
-
-      // ===== CARD 3 · Disconnect Flow (funnel) =====
-      const totalUnpaid = d.j4_accts_dac + d.j4_accts_nondac;
-      const totalDisc   = d.disc_dac + d.disc_nondac;
-      const totalRest   = d.rest_dac + d.rest_nondac;
-      const restPct = totalDisc > 0 ? totalRest / totalDisc : 0;
-      const unpaidToDisc = totalUnpaid > 0 ? (totalDisc/totalUnpaid*100).toFixed(1) : '0';
-      const paidRate = (100 - parseFloat(unpaidToDisc)).toFixed(1);
-
-      const prevUnpaid = prev ? (prev.j4_accts_dac + prev.j4_accts_nondac) : null;
-      const prevDisc   = prev ? (prev.disc_dac + prev.disc_nondac) : null;
-      const prevRest   = prev ? (prev.rest_dac + prev.rest_nondac) : null;
-      const yoyUnpaid  = (prevUnpaid && prevUnpaid > 0) ? Math.round((totalUnpaid - prevUnpaid) / prevUnpaid * 100) : null;
-      const yoyDisc    = (prevDisc   && prevDisc   > 0) ? Math.round((totalDisc   - prevDisc)   / prevDisc   * 100) : null;
-      const yoyRest    = (prevRest   && prevRest   > 0) ? Math.round((totalRest   - prevRest)   / prevRest   * 100) : null;
-
-      // ===== CARD 3 · Placeholder (funnel coming soon) =====
-      const card3 = `
-        <div class="chart-card f-card f-card-empty">
-          <div class="f-empty-content">
-            <div class="f-empty-icon">+</div>
-            <div class="f-empty-text">Coming soon</div>
-            <div class="f-empty-sub">Additional analysis in progress</div>
           </div>
         </div>`;
 
@@ -3691,21 +3708,27 @@ function renderSectionJ() {
             <div class="empty-pane">No prior year baseline available</div>
           </div>`;
       } else {
-        const dacGrowth = ((d.dpa_accts_dac - prev.dpa_accts_dac) / prev.dpa_accts_dac * 100).toFixed(0);
-        const nonGrowth = ((d.dpa_accts_nondac - prev.dpa_accts_nondac) / prev.dpa_accts_nondac * 100).toFixed(0);
+        const dacGrowthNum = Math.round((d.dpa_accts_dac - prev.dpa_accts_dac) / prev.dpa_accts_dac * 100);
+        const nonGrowthNum = Math.round((d.dpa_accts_nondac - prev.dpa_accts_nondac) / prev.dpa_accts_nondac * 100);
         const maxVal = Math.max(d.dpa_accts_dac, d.dpa_accts_nondac, prev.dpa_accts_dac, prev.dpa_accts_nondac);
-        const barChartH = 230;
+        const barChartH = 200;
         const hDac23 = (prev.dpa_accts_dac / maxVal) * barChartH;
         const hDac24 = (d.dpa_accts_dac / maxVal) * barChartH;
         const hNon23 = (prev.dpa_accts_nondac / maxVal) * barChartH;
         const hNon24 = (d.dpa_accts_nondac / maxVal) * barChartH;
+
+        const dpaPill = (pct) => {
+          const cls = pct > 0 ? 'up' : 'down';
+          const arrow = pct > 0 ? '↑ +' : '↓ ';
+          return `<span class="j-yoy-pill j-yoy-pill-${cls}">${arrow}${Math.abs(pct)}% YoY</span>`;
+        };
 
         card4 = `
           <div class="chart-card">
             <div class="chart-card-head">
               <div>
                 <h3>DPA Growth · ${yearLabel}</h3>
-                <p class="chart-sub">Payment plan enrollment · ${prevYearLabel} → ${yearLabel}</p>
+                <p class="chart-sub">Payment plan enrollment</p>
               </div>
               <div class="chart-legend">
                 <div class="legend-item"><span class="legend-swatch" style="background:var(--pale-sky)"></span>${prevYearLabel}</div>
@@ -3716,7 +3739,7 @@ function renderSectionJ() {
               <div class="j-dpa-group" data-group="dac"
                 data-prev="${prev.dpa_accts_dac.toLocaleString()}"
                 data-curr="${d.dpa_accts_dac.toLocaleString()}"
-                data-growth="+${dacGrowth}%"
+                data-growth="${dacGrowthNum >= 0 ? '+' : ''}${dacGrowthNum}%"
                 data-amt-prev="${fmtBig(prev.dpa_amt_dac)}"
                 data-amt-curr="${fmtBig(d.dpa_amt_dac)}">
                 <div class="j-dpa-bars">
@@ -3729,12 +3752,13 @@ function renderSectionJ() {
                     <div class="j-dpa-bar j-dpa-bar-curr" style="height:${hDac24}px"></div>
                   </div>
                 </div>
-                <div class="j-dpa-label">DAC<br><span class="j-dpa-growth">+${dacGrowth}% YoY</span></div>
+                <div class="j-dpa-label">DAC</div>
+                <div style="margin-top:4px">${dpaPill(dacGrowthNum)}</div>
               </div>
               <div class="j-dpa-group" data-group="nondac"
                 data-prev="${prev.dpa_accts_nondac.toLocaleString()}"
                 data-curr="${d.dpa_accts_nondac.toLocaleString()}"
-                data-growth="+${nonGrowth}%"
+                data-growth="${nonGrowthNum >= 0 ? '+' : ''}${nonGrowthNum}%"
                 data-amt-prev="${fmtBig(prev.dpa_amt_nondac)}"
                 data-amt-curr="${fmtBig(d.dpa_amt_nondac)}">
                 <div class="j-dpa-bars">
@@ -3747,19 +3771,19 @@ function renderSectionJ() {
                     <div class="j-dpa-bar j-dpa-bar-curr" style="height:${hNon24}px"></div>
                   </div>
                 </div>
-                <div class="j-dpa-label">Non-DAC<br><span class="j-dpa-growth">+${nonGrowth}% YoY</span></div>
+                <div class="j-dpa-label">Non-DAC</div>
+                <div style="margin-top:4px">${dpaPill(nonGrowthNum)}</div>
               </div>
             </div>
           </div>`;
       }
 
-      // Store data globally for tooltip wiring
       window.__sectionJ_yr = yearLabel;
       window.__sectionJ_prevYr = prevYearLabel;
       window.__sectionJ_tables = J_TABLE_NAMES;
 
       return `
-        <div class="chart-row cols-4">${card1}${card2}${card3}${card4}</div>`;
+        <div class="chart-row cols-3">${card1}${card2}${card4}</div>`;
     }
 
 
@@ -4133,7 +4157,7 @@ function wireJTooltips() {
     const tableNames = window.__sectionJ_tables || {};
 
     // ===== Card 1 · Customer Burden Dumbbell rows =====
-    document.querySelectorAll('.j-burden-row').forEach(row => {
+    document.querySelectorAll('.j-burden-html-row').forEach(row => {
       row.addEventListener('mouseenter', () => {
         const type = row.dataset.type;
         const isBurden = type === 'burden';
