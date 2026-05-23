@@ -3110,50 +3110,109 @@ function renderSectionE() {
 // SECTION F · Customer Outages
 // ------------------------------------------------------------
 function renderSectionF() {
-
     const p = state.payload;
     const yr = state.year;
     const prevYr = prevYearOf(yr);
     const hasPrev = !!prevYr;
-    const hasPrevData = hasPrev;
-    const showCurrent = (yr === p.meta.current_year);
     const yearLabel = yr;
     const prevYearLabel = prevYr || '';
-  
-      // ===== Format helpers =====
-      const fmtCompact = v => {
-        if (v == null) return '—';
-        if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
-        if (v >= 1e3) return (v/1e3).toFixed(1) + 'k';
-        return Math.round(v).toLocaleString();
-      };
-      const fmtPct = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
-      const yoyCalc = (curr, prev) => {
-        if (curr == null || prev == null || prev === 0) return null;
-        return Math.round((curr - prev) / prev * 100);
-      };
-      const yoyPill = (yoy) => {
-        if (yoy === null) return '<span class="d-yoy-pill na">n/a</span>';
-        if (yoy >= 0) return '<span class="d-yoy-pill up">↑ +' + yoy + '%</span>';
-        return '<span class="d-yoy-pill down">↓ ' + yoy + '%</span>';
-      };
 
-      // ===== Pull data for current year =====
-      // F7 - DAC % of outages
+    const fmtCompact = v => {
+      if (v == null) return '—';
+      if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
+      if (v >= 1e3) return (v/1e3).toFixed(1) + 'k';
+      return Math.round(v).toLocaleString();
+    };
+    const fmtNumF3 = v => {
+      if (v == null) return '—';
+      if (Number.isInteger(v)) return v.toLocaleString();
+      return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    };
+    const yoyCalc = (curr, prev) => {
+      if (curr == null || prev == null || prev === 0) return null;
+      return Math.round((curr - prev) / prev * 100);
+    };
 
-      const f9 = p.tables.F9;
-      
+    // ===== CARD 1 · F3 Interruption Rate (tiles) =====
+    const f3 = p.tables.F3;
+    const f3Curr = f3 && f3.data[yr] ? f3.data[yr] : [];
+    const f3Prev = f3 && f3.data[prevYr] ? f3.data[prevYr] : [];
+    const f3MetricLabel = (f3 && f3.schema_by_year && f3.schema_by_year[yr] && f3.schema_by_year[yr][1])
+      ? f3.schema_by_year[yr][1]
+      : 'Customers interrupted per 1,000 served';
 
-      // ===== CARD 3 · DAC vs Non-DAC by Borough (F9) =====
-      const f9CurrData = f9 && f9.data[yr] ? f9.data[yr] : [];
-      const f9PrevData = f9 && f9.data[prevYr] ? f9.data[prevYr] : [];
-      // F9 cols: [Borough, DAC, DAC % System, Non-DAC, Non-DAC % System]
-      const f9Boroughs = f9CurrData.filter(r => r[0] && !String(r[0]).toLowerCase().includes('grand total') && r[0] !== 'Borough / County' && r[0] !== 'County');
-      const boroughRows = f9Boroughs.map(r => {
+    const f3Rows = f3Curr.filter(r =>
+      r && r[0] && typeof r[1] === 'number' &&
+      !/grand total/i.test(String(r[0])) &&
+      !/^category$/i.test(String(r[0]))
+    );
+
+    // Strip any "(YYYY)" suffix so labels match across years
+    const stripYear = (s) => String(s).replace(/\s*\(\d{4}\)\s*/g, '').trim();
+
+    const f3PrevFor = (label) => {
+      const key = stripYear(label);
+      const found = f3Prev.find(pr => pr && pr[0] && stripYear(pr[0]) === key);
+      return found && typeof found[1] === 'number' ? found[1] : null;
+    };
+
+    const f3Tiles = f3Rows.map(r => {
+      const label = String(r[0]);
+      const val = r[1];
+      const prevVal = f3PrevFor(label);
+      const yoy = yoyCalc(val, prevVal);
+      const isConEd = /^con\s*edison/i.test(label);
+      let yoyHtml = '';
+      if (yoy === null) {
+        yoyHtml = `<span class="f3-yoy-pill f3-yoy-neutral">n/a</span>`;
+      } else if (yoy === 0) {
+        yoyHtml = `<span class="f3-yoy-pill f3-yoy-neutral">→ 0%</span>`;
+      } else if (yoy > 0) {
+        yoyHtml = `<span class="f3-yoy-pill f3-yoy-bad">↑ +${yoy}%</span>`;
+      } else {
+        yoyHtml = `<span class="f3-yoy-pill f3-yoy-good">↓ ${Math.abs(yoy)}%</span>`;
+      }
+      return `
+        <div class="f3-tile ${isConEd ? 'f3-tile-coned' : ''}"
+          data-tt-label="${label}"
+          data-tt-curr="${fmtNumF3(val)}"
+          data-tt-prev="${prevVal != null ? fmtNumF3(prevVal) : 'missing'}"
+          data-tt-yoy="${yoy !== null ? (yoy >= 0 ? '+' : '') + yoy + '%' : 'missing'}">
+          <div class="f3-tile-label">${label}</div>
+          <div class="f3-tile-value">${fmtNumF3(val)}</div>
+          <div class="f3-tile-yoy">${yoyHtml}</div>
+        </div>`;
+    }).join('');
+
+    const card1 = `
+      <div class="chart-card f-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Interruption Rate</h3>
+            <p class="chart-sub">${f3MetricLabel}</p>
+          </div>
+        </div>
+        <div class="f3-tiles-grid">
+          ${f3Tiles}
+        </div>
+      </div>`;
+
+    // ===== Helper for F8/F9 borough cards =====
+    const buildBoroughCard = (tableId, title, subtitle, sourceLabel) => {
+      const t = p.tables[tableId];
+      const curr = t && t.data[yr]    ? t.data[yr]    : [];
+      const prev = t && t.data[prevYr] ? t.data[prevYr] : [];
+      const rows = curr.filter(r =>
+        r && r[0] &&
+        !/grand total/i.test(String(r[0])) &&
+        String(r[0]) !== 'Borough / County' &&
+        String(r[0]) !== 'County'
+      );
+      const boroughs = rows.map(r => {
         const name = r[0];
         const dac = typeof r[1] === 'number' ? r[1] : 0;
         const nondac = typeof r[3] === 'number' ? r[3] : 0;
-        const prevRow = f9PrevData.find(pr => pr[0] === name);
+        const prevRow = prev.find(pr => pr && pr[0] === name);
         const prevDac = prevRow && typeof prevRow[1] === 'number' ? prevRow[1] : null;
         const prevNon = prevRow && typeof prevRow[3] === 'number' ? prevRow[3] : null;
         const total = dac + nondac;
@@ -3162,7 +3221,7 @@ function renderSectionF() {
         return { name, dac, nondac, prevDac, prevNon, total, dacPct, nonPct };
       }).sort((a, b) => a.name.localeCompare(b.name));
 
-      const card3Rows = boroughRows.map(b => {
+      const rowsHtml = boroughs.map(b => {
         const dacYoy = yoyCalc(b.dac, b.prevDac);
         const nonYoy = yoyCalc(b.nondac, b.prevNon);
         return `
@@ -3177,7 +3236,7 @@ function renderSectionF() {
             data-prev-non="${b.prevNon != null ? fmtCompact(b.prevNon) : 'n/a'}"
             data-dac-yoy="${dacYoy !== null ? (dacYoy >= 0 ? '+' : '') + dacYoy + '%' : 'n/a'}"
             data-non-yoy="${nonYoy !== null ? (nonYoy >= 0 ? '+' : '') + nonYoy + '%' : 'n/a'}"
-            data-source="F9 · Customers interrupted">
+            data-source="${sourceLabel}">
             <div class="f3-borough-name">${b.name}</div>
             <div class="f3-borough-stacked">
               <div class="f3-borough-track">
@@ -3193,12 +3252,12 @@ function renderSectionF() {
           </div>`;
       }).join('');
 
-      const card3 = `
+      return `
         <div class="chart-card f-card">
           <div class="chart-card-head">
             <div>
-              <h3>Customers Interrupted by Borough</h3>
-              <p class="chart-sub">DAC vs Non-DAC per borough · YoY change shown for DAC repairs</p>
+              <h3>${title}</h3>
+              <p class="chart-sub">${subtitle}</p>
             </div>
             <div class="chart-legend">
               <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk)"></span>DAC</div>
@@ -3206,21 +3265,27 @@ function renderSectionF() {
             </div>
           </div>
           <div class="f3-card-body">
-            ${card3Rows}
+            ${rowsHtml}
           </div>
         </div>`;
+    };
 
-      const placeholder = `
-        <div class="chart-card f-card f-card-empty">
-          <div class="f-empty-content">
-            <div class="f-empty-icon">+</div>
-            <div class="f-empty-text">Coming soon</div>
-            <div class="f-empty-sub">Additional analysis in progress</div>
-          </div>
-        </div>`;
+    const card2 = buildBoroughCard(
+      'F8',
+      'Customers by Borough',
+      'DAC vs Non-DAC customer base per borough',
+      'F8 · Customers by type'
+    );
 
-      return `<div class="chart-row cols-2">${placeholder}${card3}</div>`;
-    }
+    const card3 = buildBoroughCard(
+      'F9',
+      'Customers Interrupted by Borough',
+      'DAC vs Non-DAC per borough · YoY change shown for DAC',
+      'F9 · Customers interrupted'
+    );
+
+    return `<div class="chart-row cols-3">${card1}${card2}${card3}</div>`;
+  }
 
 // ------------------------------------------------------------
 // SECTION G · Main Replacement Program
@@ -3323,13 +3388,14 @@ function renderSectionG() {
     };
 
     // ===== Row renderer (used by both card 1 and card 2) =====
-    const renderRow = (r) => {
+    const renderRow = (r, sourceLabel) => {
       const pctNum = r.dacPct != null ? r.dacPct * 100 : 0;
       const prevPctNum = r.prev && r.prev.dacPct != null ? r.prev.dacPct * 100 : null;
       const pill = r.prev ? ppPill(r.dacPct, r.prev.dacPct) : '';
       return `
         <div class="g-row"
           data-tt-label="${r.label}"
+          data-tt-source="${sourceLabel}"
           data-tt-curr-feet="${r.total != null ? fmtCompact(r.total) + ' ft' : 'missing'}"
           data-tt-prev-feet="${r.prev && r.prev.total != null && r.prev.total > 0 ? fmtCompact(r.prev.total) + ' ft' : 'missing'}"
           data-tt-curr-pct="${r.dacPct != null ? pctNum.toFixed(0) + '%' : 'missing'}"
@@ -3359,7 +3425,7 @@ function renderSectionG() {
             ${hasPrev ? `<div class="legend-item"><span class="legend-swatch" style="background:var(--pale-sky)"></span>${prevYearLabel}</div>` : ''}
           </div>
         </div>
-        <div class="g-rows">${replacedRows.map(renderRow).join('')}</div>
+        <div class="g-rows">${replacedRows.map(r => renderRow(r, 'G · Pipe replaced')).join('')}</div>
         </div>`;
 
     // ===== Card 2 · Pipe Abandoned =====
@@ -3376,7 +3442,7 @@ function renderSectionG() {
             ${hasPrev ? `<div class="legend-item"><span class="legend-swatch" style="background:var(--pale-sky)"></span>${prevYearLabel}</div>` : ''}
           </div>
         </div>
-        <div class="g-rows">${abandonedRows.map(renderRow).join('')}</div>
+        <div class="g-rows">${abandonedRows.map(r => renderRow(r, 'G · Pipe abandoned')).join('')}</div>
         </div>`;
 
     // ===== Card 3 · Methane Emissions Avoided (G10) =====
@@ -3520,6 +3586,41 @@ function renderSectionG() {
 
     return `<div class="chart-row g-row-1-1-2">${card1}${card2}${card3}</div>`;
   }
+  function wireFSectionTooltips() {
+    let tip = document.querySelector('.exec-tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'exec-tooltip';
+      document.body.appendChild(tip);
+    }
+    const yr = state.year;
+    const prevYr = prevYearOf(yr) || '';
+    const renderVal = (v) => (v === 'missing' || v == null || v === '')
+      ? '<span style="color:var(--text-4);font-style:italic">missing</span>'
+      : v;
+    const yoyColor = (v) => {
+      if (!v || v === 'missing' || v === '0%') return 'var(--text-3)';
+      return v.startsWith('-') ? 'var(--green)' : 'var(--red)';
+    };
+
+    document.querySelectorAll('.f3-tile[data-tt-label]').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const d = el.dataset;
+         tip.innerHTML =
+          `<div class="tt-name">${d.ttLabel}</div>` +
+          `<div class="tt-row"><span>Source</span><span class="v">F3 · Interruption rate</span></div>` +
+          `<div class="tt-row"><span>Rate ${yr}</span><span class="v">${renderVal(d.ttCurr)}</span></div>` +
+          `<div class="tt-row"><span>Rate ${prevYr}</span><span class="v">${renderVal(d.ttPrev)}</span></div>` +
+          `<div class="tt-row"><span>YoY change</span><span class="v" style="color:${yoyColor(d.ttYoy)}">${renderVal(d.ttYoy)}</span></div>`;
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mousemove', e => {
+        tip.style.left = (e.pageX + 14) + 'px';
+        tip.style.top  = (e.pageY - 10) + 'px';
+      });
+      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+    });
+  }
   function wireGSectionTooltips() {
     let tip = document.querySelector('.exec-tooltip');
     if (!tip) {
@@ -3546,6 +3647,7 @@ function renderSectionG() {
         const d = el.dataset;
         tip.innerHTML =
           `<div class="tt-name">${d.ttLabel}</div>` +
+          `<div class="tt-row"><span>Source</span><span class="v">${d.ttSource || 'G · Main replacement'}</span></div>` +
           `<div class="tt-row"><span>Feet ${yr}</span><span class="v">${renderVal(d.ttCurrFeet)}</span></div>` +
           `<div class="tt-row"><span>Feet ${prevYr}</span><span class="v">${renderVal(d.ttPrevFeet)}</span></div>` +
           `<div class="tt-row"><span>DAC % ${yr}</span><span class="v">${renderVal(d.ttCurrPct)}</span></div>` +
@@ -3566,6 +3668,7 @@ function renderSectionG() {
         const d = el.dataset;
         tip.innerHTML =
           `<div class="tt-name">${d.ttLabel}</div>` +
+          `<div class="tt-row"><span>Source</span><span class="v">G10 · Methane emissions</span></div>` +
           `<div class="tt-row"><span>mT CH4 ${yr}</span><span class="v">${renderVal(d.ttCurr)}</span></div>` +
           `<div class="tt-row"><span>mT CH4 ${prevYr}</span><span class="v">${renderVal(d.ttPrev)}</span></div>` +
           `<div class="tt-row"><span>Share ${yr}</span><span class="v">${renderVal(d.ttPctCurr)}</span></div>` +
@@ -3586,6 +3689,7 @@ function renderSectionG() {
         const d = el.dataset;
         tip.innerHTML =
           `<div class="tt-name">Methane Emissions Avoided</div>` +
+          `<div class="tt-row"><span>Source</span><span class="v">G10 · Methane emissions</span></div>` +
           `<div class="tt-row"><span>Total ${yr}</span><span class="v">${renderVal(d.ttTotalCurr)}</span></div>` +
           `<div class="tt-row"><span>Total ${prevYr}</span><span class="v">${renderVal(d.ttTotalPrev)}</span></div>` +
           `<div class="tt-row"><span>Total YoY</span><span class="v" style="color:${yoyColor(d.ttTotalYoy)}">${renderVal(d.ttTotalYoy)}</span></div>` +
@@ -5302,6 +5406,7 @@ function wireHTooltips() {
     if (letter === 'J') wireJTooltips();
     if (letter === 'D') wireDTooltips();
     if (letter === 'F' || letter === 'H') wireFTooltips();
+    if (letter === 'F') wireFSectionTooltips();
     if (letter === 'G') wireGSectionTooltips();
     if (letter === 'H') wireHTooltips();
     if (letter === 'I') wireISectionTooltips();
