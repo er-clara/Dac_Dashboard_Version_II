@@ -6166,3 +6166,167 @@ a.nav-item { text-decoration: none; }
 .h-yoy-pill.h-yoy-down    { background: var(--red-tint);   color: var(--red); }
 .h-yoy-pill.h-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
 
+/* =============================================================
+   SECTION G · Pipe Retired/Abandoned + Methane
+   ============================================================= */
+
+/* Row layout: [borough | bar | YoY pill] */
+.chart-row.g-row-1-1-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .chart-row.g-row-1-1-2 { grid-template-columns: 1fr; }
+}
+
+.g-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+}
+
+.g-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 60px;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: default;
+  transition: background 0.15s;
+}
+.g-row:hover { background: var(--bright-snow); }
+
+.g-row-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.g-row-bar {
+  position: relative;
+  height: 22px;
+  background: var(--white-smoke);
+  border-radius: 3px;
+}
+
+.g-dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px var(--white);
+}
+.g-dot-prev { background: var(--pale-sky); z-index: 2; }
+.g-dot-curr { background: var(--dusk); z-index: 3; }
+
+.g-dot-pct {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin-top: 14px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--dusk);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.g-row-pill { display: flex; justify-content: flex-end; }
+
+.g-yoy-pill {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+}
+.g-yoy-pill.g-yoy-up      { background: var(--green-tint); color: var(--green); }
+.g-yoy-pill.g-yoy-down    { background: var(--red-tint);   color: var(--red); }
+.g-yoy-pill.g-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
+
+.g-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 9.5px;
+  color: var(--text-3);
+}
+
+/* ── Card 3 · Methane donut + DAC/Non-DAC blocks ── */
+.g-methane-body {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.g-methane-donut {
+  width: 100%;
+  display: block;
+}
+
+.g-methane-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.g-methane-block {
+  border-radius: 5px;
+  padding: 8px 10px;
+  cursor: default;
+  transition: background 0.15s;
+}
+.g-methane-dac {
+  background: var(--dusk-tint);
+  border-left: 3px solid var(--dusk);
+}
+.g-methane-non {
+  background: var(--white-smoke);
+  border-left: 3px solid var(--pale-sky);
+}
+.g-methane-block:hover { filter: brightness(0.98); }
+
+.g-methane-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+.g-methane-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.g-methane-dac .g-methane-label { color: var(--dusk); }
+.g-methane-non .g-methane-label { color: var(--text-2); }
+
+.g-methane-num {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-feature-settings: "tnum";
+}
+.g-methane-dac .g-methane-num { color: var(--dusk); }
+.g-methane-non .g-methane-num { color: var(--text-2); }
+
+.g-methane-sub {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+

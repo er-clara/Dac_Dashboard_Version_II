@@ -3226,26 +3226,384 @@ function renderSectionF() {
 // SECTION G · Main Replacement Program
 // ------------------------------------------------------------
 function renderSectionG() {
-
     const p = state.payload;
     const yr = state.year;
     const prevYr = prevYearOf(yr);
     const hasPrev = !!prevYr;
-    const hasPrevData = hasPrev;
-    const showCurrent = (yr === p.meta.current_year);
     const yearLabel = yr;
     const prevYearLabel = prevYr || '';
-      const placeholder = `
-        <div class="chart-card f-card f-card-empty">
-          <div class="f-empty-content">
-            <div class="f-empty-icon">+</div>
-            <div class="f-empty-text">Coming soon</div>
-            <div class="f-empty-sub">Additional analysis in progress</div>
+
+    const fmtCompact = v => {
+      if (v == null) return '—';
+      if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
+      if (v >= 1e3) return (v/1e3).toFixed(1) + 'k';
+      return Math.round(v).toLocaleString();
+    };
+
+    // ===== Read a (dac, total) pair for a given (tableId, year) =====
+    // G1 = systemwide replaced; G2/G4/G6/G8 = borough replaced
+    // G3/G5/G7/G9 = borough abandoned
+    // Schema: row 0 = DAC, row 1 = Non-DAC; col 1 = feet, col 2 = %
+    const readPair = (tableId, year) => {
+      const t = p.tables[tableId];
+      if (!t || !t.data || !t.data[year]) {
+        return { dac: null, nondac: null, total: null, dacPct: null };
+      }
+      const rows = t.data[year];
+      let dacFeet = null, nondacFeet = null;
+      let dacPctRaw = null, nondacPctRaw = null;
+
+      rows.forEach(r => {
+        if (!r || !r[0]) return;
+        const label = String(r[0]).toLowerCase();
+        const feet = typeof r[1] === 'number' ? r[1] : null;
+        const pct  = typeof r[2] === 'number' ? r[2] : null;
+
+        // Skip pure total rows (Systemwide Total, County Total, Grand Total)
+        // but keep "Total mT CH4 in DACs / in Non-DACs" rows (G10)
+        if (/total/i.test(label) && !/(in (a |non-?)?dacs?|within (a )?dacs?)/i.test(label)) return;
+
+        // Order matters: check Non-DAC first because "not in a dac" contains "dac"
+        if (/not in (a )?dacs?/i.test(label) || /non-?dacs?/i.test(label)) {
+          nondacFeet = feet;
+          nondacPctRaw = pct;
+        } else if (/(within|in) (a )?dacs?/i.test(label)) {
+          dacFeet = feet;
+          dacPctRaw = pct;
+        }
+      });
+
+      // Total feet: only if both feet values are present
+      const total = (dacFeet != null && nondacFeet != null) ? dacFeet + nondacFeet : null;
+
+      // DAC %: prefer the explicit % from the table; fall back to computing from feet
+      let dacPct = null;
+      if (dacPctRaw != null) {
+        dacPct = dacPctRaw;
+      } else if (dacFeet != null && total != null && total > 0) {
+        dacPct = dacFeet / total;
+      }
+
+      return {
+        dac: dacFeet,
+        nondac: nondacFeet,
+        total: total,
+        dacPct: dacPct
+      };
+    };
+
+    // ===== Borough config: { label, replacedTable, abandonedTable } =====
+    const BOROUGHS = [
+      { label: 'Bronx',       repl: 'G2', aban: 'G3' },
+      { label: 'Manhattan',   repl: 'G4', aban: 'G5' },
+      { label: 'Queens',      repl: 'G6', aban: 'G7' },
+      { label: 'Westchester', repl: 'G8', aban: 'G9' },
+    ];
+
+    // ===== Build row data for cards 1 & 2 =====
+    const replacedRows = BOROUGHS.map(b => ({
+      label: b.label,
+      ...readPair(b.repl, yr),
+      prev: readPair(b.repl, prevYr),
+    }));
+    const abandonedRows = BOROUGHS.map(b => ({
+      label: b.label,
+      ...readPair(b.aban, yr),
+      prev: readPair(b.aban, prevYr),
+    }));
+
+    // ===== YoY pp pill (good = up, bad = down) for DAC share =====
+    const ppPill = (curr, prev) => {
+      if (curr == null || prev == null) return '';
+      const delta = Math.round((curr - prev) * 100);
+      if (delta === 0) return `<span class="g-yoy-pill g-yoy-neutral">→ 0pp</span>`;
+      const cls = delta > 0 ? 'g-yoy-up' : 'g-yoy-down';
+      const sign = delta > 0 ? '+' : '';
+      return `<span class="g-yoy-pill ${cls}">${sign}${delta}pp</span>`;
+    };
+
+    // ===== Row renderer (used by both card 1 and card 2) =====
+    const renderRow = (r) => {
+      const pctNum = r.dacPct != null ? r.dacPct * 100 : 0;
+      const prevPctNum = r.prev && r.prev.dacPct != null ? r.prev.dacPct * 100 : null;
+      const pill = r.prev ? ppPill(r.dacPct, r.prev.dacPct) : '';
+      return `
+        <div class="g-row"
+          data-tt-label="${r.label}"
+          data-tt-curr-feet="${r.total != null ? fmtCompact(r.total) + ' ft' : 'missing'}"
+          data-tt-prev-feet="${r.prev && r.prev.total != null && r.prev.total > 0 ? fmtCompact(r.prev.total) + ' ft' : 'missing'}"
+          data-tt-curr-pct="${r.dacPct != null ? pctNum.toFixed(0) + '%' : 'missing'}"
+          data-tt-prev-pct="${r.prev && r.prev.dacPct != null ? Math.round(r.prev.dacPct * 100) + '%' : 'missing'}"
+          data-tt-yoy="${r.prev && r.prev.dacPct != null && r.dacPct != null ? (Math.round((r.dacPct - r.prev.dacPct) * 100) >= 0 ? '+' : '') + Math.round((r.dacPct - r.prev.dacPct) * 100) + 'pp' : 'missing'}">
+          <div class="g-row-label">${r.label}</div>
+          <div class="g-row-bar">
+            ${prevPctNum !== null ? `<div class="g-dot g-dot-prev" style="left:${prevPctNum}%"></div>` : ''}
+            <div class="g-dot g-dot-curr" style="left:${pctNum}%"></div>
+            <span class="g-dot-pct" style="left:${pctNum}%">${r.dacPct != null ? pctNum.toFixed(0) + '%' : '—'}</span>
           </div>
+          <div class="g-row-pill">${pill}</div>
+        </div>`;
+    };
+
+    // ===== Card 1 · Pipe Retired & Replaced =====
+    const c1Total = null;
+    const card1 = `
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Pipe Retired &amp; Replaced</h3>
+            <p class="chart-sub">Feet Replaced within DAC</p>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk)"></span>${yearLabel}</div>
+            ${hasPrev ? `<div class="legend-item"><span class="legend-swatch" style="background:var(--pale-sky)"></span>${prevYearLabel}</div>` : ''}
+          </div>
+        </div>
+        <div class="g-rows">${replacedRows.map(renderRow).join('')}</div>
         </div>`;
 
-      return `<div class="chart-row cols-2">${placeholder}${placeholder}</div>`;
+    // ===== Card 2 · Pipe Abandoned =====
+    const c2Total = abandonedRows[0].total;
+    const card2 = `
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Pipe Abandoned</h3>
+            <p class="chart-sub">Feet Abandoned within DAC</p>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:var(--dusk)"></span>${yearLabel}</div>
+            ${hasPrev ? `<div class="legend-item"><span class="legend-swatch" style="background:var(--pale-sky)"></span>${prevYearLabel}</div>` : ''}
+          </div>
+        </div>
+        <div class="g-rows">${abandonedRows.map(renderRow).join('')}</div>
+        </div>`;
+
+    // ===== Card 3 · Methane Emissions Avoided (G10) =====
+    const g10Curr = readPair('G10', yr);
+    const g10Prev = readPair('G10', prevYr);
+
+    // % live in column 2 of each row — read literally, no calc
+    const readPctFor = (tableId, year, which) => {
+      const t = p.tables[tableId];
+      if (!t || !t.data || !t.data[year]) return null;
+      for (const r of t.data[year]) {
+        if (!r || !r[0]) continue;
+        const label = String(r[0]).toLowerCase();
+        if (/total/i.test(label) && !/(in (a |non-?)?dacs?|within (a )?dacs?)/i.test(label)) continue;
+        const isNonDac = /not in (a )?dacs?/i.test(label) || /non-?dacs?/i.test(label);
+        const isDac    = /(within|in) (a )?dacs?/i.test(label) && !isNonDac;
+        if (which === 'dac'    && isDac)    return typeof r[2] === 'number' ? r[2] : null;
+        if (which === 'nondac' && isNonDac) return typeof r[2] === 'number' ? r[2] : null;
+      }
+      return null;
+    };
+
+    const dacPctCurr  = readPctFor('G10', yr,     'dac');
+    const nonPctCurr  = readPctFor('G10', yr,     'nondac');
+    const dacPctPrev  = readPctFor('G10', prevYr, 'dac');
+    const nonPctPrev  = readPctFor('G10', prevYr, 'nondac');
+
+    const fmtMt = v => v == null ? null : v.toFixed(2);
+    const fmtPct = v => v == null ? null : Math.round(v * 100) + '%';
+
+    // Display values (or 'missing')
+    const dacCurrStr     = g10Curr.dac    != null ? fmtMt(g10Curr.dac)    + ' mT CH4' : 'missing';
+    const dacPrevStr     = g10Prev.dac    != null ? fmtMt(g10Prev.dac)    + ' mT CH4' : 'missing';
+    const nonCurrStr     = g10Curr.nondac != null ? fmtMt(g10Curr.nondac) + ' mT CH4' : 'missing';
+    const nonPrevStr     = g10Prev.nondac != null ? fmtMt(g10Prev.nondac) + ' mT CH4' : 'missing';
+    const totalCurrStr   = g10Curr.total  != null ? fmtMt(g10Curr.total)  + ' mT CH4' : 'missing';
+    const totalPrevStr   = g10Prev.total  != null ? fmtMt(g10Prev.total)  + ' mT CH4' : 'missing';
+    const dacPctCurrStr  = fmtPct(dacPctCurr) || 'missing';
+    const dacPctPrevStr  = fmtPct(dacPctPrev) || 'missing';
+    const nonPctCurrStr  = fmtPct(nonPctCurr) || 'missing';
+    const nonPctPrevStr  = fmtPct(nonPctPrev) || 'missing';
+    // YoY pills (mT CH4 % change)
+    const yoyPillMt = (curr, prev) => {
+      if (curr == null || prev == null || prev === 0) return '';
+      const pct = Math.round((curr - prev) / Math.abs(prev) * 100);
+      if (pct === 0) return `<span class="g-yoy-pill g-yoy-neutral">→ 0%</span>`;
+      const cls = pct > 0 ? 'g-yoy-up' : 'g-yoy-down';
+      const arrow = pct > 0 ? '↑ +' : '↓ ';
+      return `<span class="g-yoy-pill ${cls}">${arrow}${Math.abs(pct)}%</span>`;
+    };
+    const dacYoyPill   = yoyPillMt(g10Curr.dac,    g10Prev.dac);
+    const nonYoyPill   = yoyPillMt(g10Curr.nondac, g10Prev.nondac);
+    const totalYoyPill = yoyPillMt(g10Curr.total,  g10Prev.total);
+
+    // YoY raw strings for tooltips
+    const dacYoyStr   = (g10Curr.dac    != null && g10Prev.dac    != null && g10Prev.dac    !== 0) ? ((g10Curr.dac    - g10Prev.dac)    / Math.abs(g10Prev.dac)    * 100 >= 0 ? '+' : '') + Math.round((g10Curr.dac    - g10Prev.dac)    / Math.abs(g10Prev.dac)    * 100) + '%' : 'missing';
+    const nonYoyStr   = (g10Curr.nondac != null && g10Prev.nondac != null && g10Prev.nondac !== 0) ? ((g10Curr.nondac - g10Prev.nondac) / Math.abs(g10Prev.nondac) * 100 >= 0 ? '+' : '') + Math.round((g10Curr.nondac - g10Prev.nondac) / Math.abs(g10Prev.nondac) * 100) + '%' : 'missing';
+    const totalYoyStr = (g10Curr.total  != null && g10Prev.total  != null && g10Prev.total  !== 0) ? ((g10Curr.total  - g10Prev.total)  / Math.abs(g10Prev.total)  * 100 >= 0 ? '+' : '') + Math.round((g10Curr.total  - g10Prev.total)  / Math.abs(g10Prev.total)  * 100) + '%' : 'missing';
+
+    // Donut math
+    const circumference = 2 * Math.PI * 70;
+    const dacDash = (dacPctCurr != null) ? dacPctCurr * circumference : 0;
+    const nonDash = (nonPctCurr != null) ? nonPctCurr * circumference : 0;
+
+    const g10HasData = (g10Curr.dac != null || g10Curr.nondac != null);
+
+    const card3 = !g10HasData ? `
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Methane Emissions Avoided</h3>
+            <p class="chart-sub">DAC share · mT CH4</p>
+          </div>
+        </div>
+        <div class="empty-pane">No data available for ${yearLabel}</div>
+      </div>` : `
+      <div class="chart-card">
+        <div class="chart-card-head">
+          <div>
+            <h3>Methane Emissions Avoided</h3>
+            <p class="chart-sub">DAC share · mT CH4</p>
+          </div>
+        </div>
+        <div class="g-methane-body">
+          <svg viewBox="0 0 200 200" class="g-methane-donut"
+            data-tt-total-curr="${totalCurrStr}"
+            data-tt-total-prev="${totalPrevStr}"
+            data-tt-total-yoy="${totalYoyStr}"
+            data-tt-dac-curr="${dacCurrStr}"
+            data-tt-dac-prev="${dacPrevStr}"
+            data-tt-dac-pct-curr="${dacPctCurrStr}"
+            data-tt-dac-pct-prev="${dacPctPrevStr}"
+            data-tt-dac-yoy="${dacYoyStr}"
+            data-tt-non-curr="${nonCurrStr}"
+            data-tt-non-prev="${nonPrevStr}"
+            data-tt-non-pct-curr="${nonPctCurrStr}"
+            data-tt-non-pct-prev="${nonPctPrevStr}"
+            data-tt-non-yoy="${nonYoyStr}">
+            <circle cx="100" cy="100" r="70" fill="none" stroke="var(--white-smoke)" stroke-width="40"></circle>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="var(--pale-sky)" stroke-width="40"
+              stroke-dasharray="${nonDash.toFixed(2)} ${circumference.toFixed(2)}"
+              stroke-dashoffset="0" transform="rotate(-90 100 100)"></circle>
+            <circle cx="100" cy="100" r="70" fill="none" stroke="var(--dusk)" stroke-width="40"
+              stroke-dasharray="${dacDash.toFixed(2)} ${circumference.toFixed(2)}"
+              stroke-dashoffset="${(-nonDash).toFixed(2)}" transform="rotate(-90 100 100)"></circle>
+            <text x="100" y="92" text-anchor="middle" font-size="22" font-weight="700" fill="var(--text)">${g10Curr.total != null ? fmtMt(g10Curr.total) : '—'}</text>
+            <text x="100" y="108" text-anchor="middle" font-size="8" fill="var(--text-3)" font-weight="600" letter-spacing="0.06em">MT CH4 TOTAL</text>
+          </svg>
+          <div class="g-methane-blocks">
+            <div class="g-methane-block g-methane-dac"
+              data-tt-label="DAC"
+              data-tt-curr="${dacCurrStr}"
+              data-tt-prev="${dacPrevStr}"
+              data-tt-pct-curr="${dacPctCurrStr}"
+              data-tt-pct-prev="${dacPctPrevStr}"
+              data-tt-yoy="${dacYoyStr}">
+              <div class="g-methane-row">
+                <span class="g-methane-label">DAC</span>
+                ${dacYoyPill}
+              </div>
+              <div class="g-methane-num">${g10Curr.dac != null ? fmtMt(g10Curr.dac) : '—'}</div>
+              <div class="g-methane-sub">${dacPctCurr != null ? Math.round(dacPctCurr * 100) + '% · mT CH4' : 'mT CH4'}</div>
+            </div>
+            <div class="g-methane-block g-methane-non"
+              data-tt-label="Non-DAC"
+              data-tt-curr="${nonCurrStr}"
+              data-tt-prev="${nonPrevStr}"
+              data-tt-pct-curr="${nonPctCurrStr}"
+              data-tt-pct-prev="${nonPctPrevStr}"
+              data-tt-yoy="${nonYoyStr}">
+              <div class="g-methane-row">
+                <span class="g-methane-label">Non-DAC</span>
+                ${nonYoyPill}
+              </div>
+              <div class="g-methane-num">${g10Curr.nondac != null ? fmtMt(g10Curr.nondac) : '—'}</div>
+              <div class="g-methane-sub">${nonPctCurr != null ? Math.round(nonPctCurr * 100) + '% · mT CH4' : 'mT CH4'}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    return `<div class="chart-row g-row-1-1-2">${card1}${card2}${card3}</div>`;
+  }
+  function wireGSectionTooltips() {
+    let tip = document.querySelector('.exec-tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'exec-tooltip';
+      document.body.appendChild(tip);
     }
+
+    const yr = state.year;
+    const prevYr = prevYearOf(yr) || '';
+
+    const renderVal = (v) => (v === 'missing' || v == null || v === '')
+      ? '<span style="color:var(--text-4);font-style:italic">missing</span>'
+      : v;
+
+    const yoyColor = (v) => {
+      if (!v || v === 'missing' || v === '0%' || v === '0pp') return 'var(--text-3)';
+      return v.startsWith('-') ? 'var(--red)' : 'var(--green)';
+    };
+
+    // Card 1 & 2 · borough rows
+    document.querySelectorAll('.g-row[data-tt-label]').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const d = el.dataset;
+        tip.innerHTML =
+          `<div class="tt-name">${d.ttLabel}</div>` +
+          `<div class="tt-row"><span>Feet ${yr}</span><span class="v">${renderVal(d.ttCurrFeet)}</span></div>` +
+          `<div class="tt-row"><span>Feet ${prevYr}</span><span class="v">${renderVal(d.ttPrevFeet)}</span></div>` +
+          `<div class="tt-row"><span>DAC % ${yr}</span><span class="v">${renderVal(d.ttCurrPct)}</span></div>` +
+          `<div class="tt-row"><span>DAC % ${prevYr}</span><span class="v">${renderVal(d.ttPrevPct)}</span></div>` +
+          `<div class="tt-row"><span>YoY change</span><span class="v" style="color:${yoyColor(d.ttYoy)}">${renderVal(d.ttYoy)}</span></div>`;
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mousemove', e => {
+        tip.style.left = (e.pageX + 14) + 'px';
+        tip.style.top  = (e.pageY - 10) + 'px';
+      });
+      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+    });
+
+    // Card 3 · Methane DAC / Non-DAC blocks
+    document.querySelectorAll('.g-methane-block[data-tt-label]').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const d = el.dataset;
+        tip.innerHTML =
+          `<div class="tt-name">${d.ttLabel}</div>` +
+          `<div class="tt-row"><span>mT CH4 ${yr}</span><span class="v">${renderVal(d.ttCurr)}</span></div>` +
+          `<div class="tt-row"><span>mT CH4 ${prevYr}</span><span class="v">${renderVal(d.ttPrev)}</span></div>` +
+          `<div class="tt-row"><span>Share ${yr}</span><span class="v">${renderVal(d.ttPctCurr)}</span></div>` +
+          `<div class="tt-row"><span>Share ${prevYr}</span><span class="v">${renderVal(d.ttPctPrev)}</span></div>` +
+          `<div class="tt-row"><span>YoY change</span><span class="v" style="color:${yoyColor(d.ttYoy)}">${renderVal(d.ttYoy)}</span></div>`;
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mousemove', e => {
+        tip.style.left = (e.pageX + 14) + 'px';
+        tip.style.top  = (e.pageY - 10) + 'px';
+      });
+      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+    });
+
+    // Card 3 · Methane donut (overall)
+    document.querySelectorAll('.g-methane-donut').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const d = el.dataset;
+        tip.innerHTML =
+          `<div class="tt-name">Methane Emissions Avoided</div>` +
+          `<div class="tt-row"><span>Total ${yr}</span><span class="v">${renderVal(d.ttTotalCurr)}</span></div>` +
+          `<div class="tt-row"><span>Total ${prevYr}</span><span class="v">${renderVal(d.ttTotalPrev)}</span></div>` +
+          `<div class="tt-row"><span>Total YoY</span><span class="v" style="color:${yoyColor(d.ttTotalYoy)}">${renderVal(d.ttTotalYoy)}</span></div>` +
+          `<div class="tt-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line)"><span>DAC ${yr}</span><span class="v">${renderVal(d.ttDacCurr)} · ${renderVal(d.ttDacPctCurr)}</span></div>` +
+          `<div class="tt-row"><span>DAC ${prevYr}</span><span class="v">${renderVal(d.ttDacPrev)} · ${renderVal(d.ttDacPctPrev)}</span></div>` +
+          `<div class="tt-row"><span>DAC YoY</span><span class="v" style="color:${yoyColor(d.ttDacYoy)}">${renderVal(d.ttDacYoy)}</span></div>` +
+          `<div class="tt-row" style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--line)"><span>Non-DAC ${yr}</span><span class="v">${renderVal(d.ttNonCurr)} · ${renderVal(d.ttNonPctCurr)}</span></div>` +
+          `<div class="tt-row"><span>Non-DAC ${prevYr}</span><span class="v">${renderVal(d.ttNonPrev)} · ${renderVal(d.ttNonPctPrev)}</span></div>` +
+          `<div class="tt-row"><span>Non-DAC YoY</span><span class="v" style="color:${yoyColor(d.ttNonYoy)}">${renderVal(d.ttNonYoy)}</span></div>`;
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mousemove', e => {
+        tip.style.left = (e.pageX + 14) + 'px';
+        tip.style.top  = (e.pageY - 10) + 'px';
+      });
+      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+    });
+  }
 
 // ------------------------------------------------------------
 // SECTION H · Leak Repairs
@@ -4944,6 +5302,7 @@ function wireHTooltips() {
     if (letter === 'J') wireJTooltips();
     if (letter === 'D') wireDTooltips();
     if (letter === 'F' || letter === 'H') wireFTooltips();
+    if (letter === 'G') wireGSectionTooltips();
     if (letter === 'H') wireHTooltips();
     if (letter === 'I') wireISectionTooltips();
 
