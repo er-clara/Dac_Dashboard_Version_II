@@ -6430,3 +6430,26 @@ a.nav-item { text-decoration: none; }
 .e-yoy-pill.e-yoy-up      { background: var(--green-tint); color: var(--green); }
 .e-yoy-pill.e-yoy-down    { background: var(--red-tint);   color: var(--red); }
 .e-yoy-pill.e-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
+
+
+/* ── Section A · stacked bar YoY column ── */
+.bar-yoy {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.bar-yoy-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+  text-align: center;
+  min-width: 58px;
+}
+.bar-yoy-pill.bar-yoy-up      { background: var(--green-tint); color: var(--green); }
+.bar-yoy-pill.bar-yoy-down    { background: var(--red-tint);   color: var(--red); }
+.bar-yoy-pill.bar-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }

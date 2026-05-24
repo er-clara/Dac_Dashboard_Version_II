@@ -548,6 +548,7 @@
     opts = opts || {};
     const max = opts.max || Math.max(...items.map(i => i.total));
     const labelW = opts.labelW || 140;
+    const showYoy = typeof opts.yoyFor === 'function';
     return `<div class="bar-chart">${items.map(item => {
       const totalPct = max > 0 ? (item.total / max) : 0;
       const trackWidth = `${(totalPct * 100).toFixed(2)}%`;
@@ -561,8 +562,26 @@
         ? Object.entries(opts.dataAttrs(item)).map(([k, v]) => `data-${k}="${escapeHtml(String(v))}"`).join(' ')
         : '';
       const rowClass = opts.rowClass ? ` ${opts.rowClass}` : '';
+
+      // YoY pill (optional). yoyFor(item) returns a number (percent) or null.
+      let yoyHtml = '';
+      let gridCols = `${labelW}px 1fr auto`;
+      if (showYoy) {
+        const yoy = opts.yoyFor(item);
+        gridCols = `${labelW}px 1fr auto 70px`;
+        if (yoy === null || yoy === undefined) {
+          yoyHtml = `<div class="bar-yoy"><span class="bar-yoy-pill bar-yoy-neutral">n/a</span></div>`;
+        } else if (yoy === 0) {
+          yoyHtml = `<div class="bar-yoy"><span class="bar-yoy-pill bar-yoy-neutral">→ 0%</span></div>`;
+        } else if (yoy > 0) {
+          yoyHtml = `<div class="bar-yoy"><span class="bar-yoy-pill bar-yoy-up">↑ +${yoy}%</span></div>`;
+        } else {
+          yoyHtml = `<div class="bar-yoy"><span class="bar-yoy-pill bar-yoy-down">↓ ${Math.abs(yoy)}%</span></div>`;
+        }
+      }
+
       return `
-        <div class="bar-row${rowClass}" ${dataAttrs} style="grid-template-columns: ${labelW}px 1fr auto;">
+        <div class="bar-row${rowClass}" ${dataAttrs} style="grid-template-columns: ${gridCols};">
           <div class="bar-label" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
           <div class="bar-track" style="width:100%; background:transparent;">
             <div style="width:${trackWidth}; display:flex; height:100%; background:var(--white-smoke); border-radius:3px; overflow:hidden;">
@@ -571,6 +590,7 @@
             </div>
           </div>
           <div class="bar-value">${opts.fmt ? opts.fmt(item.total) : fmtCompact(item.total)}${subVal}</div>
+          ${yoyHtml}
         </div>`;
     }).join('')}</div>`;
   }
@@ -2126,7 +2146,18 @@
             </div>
           </div>
           <div class="chart-body">
-            ${stackedBar(top10, { labelW: 200, fmt: fmtMoney, dataAttrs: a1DataAttrs, rowClass: 'a-stacked-row' })}
+            ${stackedBar(top10, {
+              labelW: 200,
+              fmt: fmtMoney,
+              dataAttrs: a1DataAttrs,
+              rowClass: 'a-stacked-row',
+              yoyFor: item => {
+                const orig = a1Chart.find(x => x.name === item.name);
+                const prev = a1PrevByName[item.name];
+                if (!orig || !prev || !prev.dac || prev.dac === 0) return null;
+                return Math.round((orig.dac - prev.dac) / prev.dac * 100);
+              }
+            })}
           </div>
         </div>
         <div class="chart-card">
@@ -2144,7 +2175,18 @@
             </div>
           </div>
           <div class="chart-body">
-            ${stackedBar(a2Top10, { labelW: 200, fmt: v => fmtCompact(v) + ' MMBtu', dataAttrs: a2DataAttrs, rowClass: 'a-stacked-row' })}
+            ${stackedBar(a2Top10, {
+              labelW: 200,
+              fmt: v => fmtCompact(v) + ' MMBtu',
+              dataAttrs: a2DataAttrs,
+              rowClass: 'a-stacked-row',
+              yoyFor: item => {
+                const orig = a2Programs.find(x => x.name === item.name);
+                const prev = a2PrevByName[item.name];
+                if (!orig || !prev || !prev.dac || prev.dac === 0) return null;
+                return Math.round((orig.dac - prev.dac) / prev.dac * 100);
+              }
+            })}
           </div>
         </div>
         <div class="chart-card analytical">
