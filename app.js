@@ -3058,13 +3058,31 @@ function renderSectionE() {
         const w24 = maxAmt > 0 ? (cat.total24 / maxAmt) * 100 : 0;
         const w23 = maxAmt > 0 ? (cat.total23 / maxAmt) * 100 : 0;
         const showPrev = cat.prev !== null || cat.total23 > 0;
+
+        // YoY $ change vs prior year
+        let yoyAmt = null;
+        if (cat.total23 > 0) {
+          yoyAmt = Math.round((cat.total24 - cat.total23) / cat.total23 * 100);
+        }
+        let yoyHtml = '';
+        if (yoyAmt === null) {
+          yoyHtml = `<span class="e-yoy-pill e-yoy-neutral">n/a</span>`;
+        } else if (yoyAmt === 0) {
+          yoyHtml = `<span class="e-yoy-pill e-yoy-neutral">→ 0%</span>`;
+        } else if (yoyAmt > 0) {
+          yoyHtml = `<span class="e-yoy-pill e-yoy-up">↑ +${yoyAmt}%</span>`;
+        } else {
+          yoyHtml = `<span class="e-yoy-pill e-yoy-down">↓ ${Math.abs(yoyAmt)}%</span>`;
+        }
+
         return `
           <div class="e-yoy-row"
             data-name="${cat.name}"
             data-total24="${fmtBig(cat.total24)}"
             data-total23="${fmtBig(cat.total23)}"
             data-curr="${(cat.curr*100).toFixed(0)}%"
-            data-prev="${cat.prev !== null ? (cat.prev*100).toFixed(0)+'%' : 'n/a'}">
+            data-prev="${cat.prev !== null ? (cat.prev*100).toFixed(0)+'%' : 'n/a'}"
+            data-yoy="${yoyAmt !== null ? (yoyAmt >= 0 ? '+' : '') + yoyAmt + '%' : 'n/a'}">
             <div class="e-yoy-label">${cat.name}</div>
             <div class="e-yoy-bars">
               <div class="e-yoy-bar-line">
@@ -3079,6 +3097,7 @@ function renderSectionE() {
                 <span class="e-yoy-amt">${fmtBig(cat.total23)}</span>
               </div>` : ''}
             </div>
+            <div class="e-yoy-change">${yoyHtml}</div>
           </div>`;
       }).join('');
 
@@ -4822,7 +4841,6 @@ function drawSectionEArc() {
       hitZones.push({ cx, cat, delta, isBig });
     });
 
-    // Tooltip handling for arcs
     let tip = document.querySelector('.e-tt');
     if (!tip) {
       tip = document.createElement('div');
@@ -4854,15 +4872,20 @@ function drawSectionEArc() {
     };
     canvas.onmouseleave = function() { tip.style.opacity = '0'; };
 
-    // Tooltip handling for YoY rows
     document.querySelectorAll('.e-yoy-row').forEach(row => {
       row.onmouseenter = function() {
+        const yoyVal = row.dataset.yoy;
+        let yoyColor = 'var(--text-3)';
+        if (yoyVal && yoyVal !== 'n/a' && yoyVal !== '0%') {
+          yoyColor = yoyVal.startsWith('-') ? 'var(--red)' : 'var(--green)';
+        }
         tip.innerHTML =
           '<div class="e-tt-name">' + row.dataset.name + '</div>' +
           '<div class="e-tt-row"><span>' + yr + ' investment</span><span class="v">' + row.dataset.total24 + '</span></div>' +
           '<div class="e-tt-row"><span>' + window.__sectionE_prevYr + ' investment</span><span class="v">' + row.dataset.total23 + '</span></div>' +
           '<div class="e-tt-row"><span>DAC % ' + yr + '</span><span class="v">' + row.dataset.curr + '</span></div>' +
-          '<div class="e-tt-row"><span>DAC % ' + window.__sectionE_prevYr + '</span><span class="v">' + row.dataset.prev + '</span></div>';
+          '<div class="e-tt-row"><span>DAC % ' + window.__sectionE_prevYr + '</span><span class="v">' + row.dataset.prev + '</span></div>' +
+          '<div class="e-tt-row"><span>YoY change</span><span class="v" style="color:' + yoyColor + '">' + (yoyVal || 'n/a') + '</span></div>';
         tip.style.opacity = '1';
       };
       row.onmousemove = function(e) {

@@ -6403,3 +6403,31 @@ a.nav-item { text-decoration: none; }
 .f3-yoy-pill.f3-yoy-good    { background: var(--green-tint); color: var(--green); }
 .f3-yoy-pill.f3-yoy-bad     { background: var(--red-tint);   color: var(--red); }
 .f3-yoy-pill.f3-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
+
+/* ── Section E · YoY change column ── */
+.e-yoy-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 70px;
+  gap: 12px;
+  align-items: center;
+}
+
+.e-yoy-change {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 70px;
+}
+
+.e-yoy-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+  text-align: center;
+}
+.e-yoy-pill.e-yoy-up      { background: var(--green-tint); color: var(--green); }
+.e-yoy-pill.e-yoy-down    { background: var(--red-tint);   color: var(--red); }
+.e-yoy-pill.e-yoy-neutral { background: var(--white-smoke); color: var(--text-3); }
