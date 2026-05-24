@@ -6385,9 +6385,8 @@ a.nav-item { text-decoration: none; }
 
 .f3-tile-yoy {
   position: absolute;
-  top: 50%;
+  bottom: 14px;
   right: 12px;
-  transform: translateY(-50%);
 }
 
 .f3-yoy-pill {

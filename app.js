@@ -3160,11 +3160,18 @@ function renderSectionF() {
       ? f3.schema_by_year[yr][1]
       : 'Customers interrupted per 1,000 served';
 
-    const f3Rows = f3Curr.filter(r =>
+    let f3Rows = f3Curr.filter(r =>
       r && r[0] && typeof r[1] === 'number' &&
       !/grand total/i.test(String(r[0])) &&
       !/^category$/i.test(String(r[0]))
     );
+
+    // Reorder: move the "Overall" row (if present) to the end so it spans full width via :last-child
+    const overallIdx = f3Rows.findIndex(r => /\boverall\b/i.test(String(r[0])));
+    if (overallIdx >= 0 && overallIdx !== f3Rows.length - 1) {
+      const [overall] = f3Rows.splice(overallIdx, 1);
+      f3Rows.push(overall);
+    }
 
     // Strip any "(YYYY)" suffix so labels match across years
     const stripYear = (s) => String(s).replace(/\s*\(\d{4}\)\s*/g, '').trim();
